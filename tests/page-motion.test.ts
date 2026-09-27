@@ -147,10 +147,13 @@ describe('接线与样式', () => {
     expect(css).toMatch(/\.node-card\.node-card-switch-enter-from \{\n\s+opacity: 0;\n\s+transform: translateY\(10px\) scale\(0\.985\);\n\s+filter: blur\(3px\);/)
   })
 
-  it('换页过渡只作用于页面主体，数值与上游一致', () => {
-    expect(css).toMatch(/\.page-enter-active \.app-shell > main \{\n\s+transition: all 300ms cubic-bezier\(0, 0, 0\.2, 1\);/)
-    expect(css).toMatch(/\.page-enter-from \.app-shell > main \{\n\s+opacity: 0;\n\s+translate: 0 0\.5rem;/)
-    expect(css).toMatch(/\.page-leave-active \.app-shell > main \{\n\s+transition: opacity 150ms cubic-bezier\(0\.4, 0, 1, 1\);/)
-    expect(css).toMatch(/\.page-leave-to \.app-shell > main \{\n\s+opacity: 0;/)
+  it('换页过渡作用于页面主体与页脚，顶栏不动，数值与上游一致', () => {
+    // 页脚紧跟在内容之后：只让主体过渡时，内容透明期间页脚会单独露出来（「先看到页脚」）。
+    const both = (state: string) => `\\.page-${state} \\.app-shell > main,\\n\\.page-${state} \\.app-shell > footer \\{`
+    expect(css).toMatch(new RegExp(`${both('enter-active')}\\n\\s+transition: all 300ms cubic-bezier\\(0, 0, 0\\.2, 1\\);`))
+    expect(css).toMatch(new RegExp(`${both('enter-from')}\\n\\s+opacity: 0;\\n\\s+translate: 0 0\\.5rem;`))
+    expect(css).toMatch(new RegExp(`${both('leave-active')}\\n\\s+transition: opacity 150ms cubic-bezier\\(0\\.4, 0, 1, 1\\);`))
+    expect(css).toMatch(new RegExp(`${both('leave-to')}\\n\\s+opacity: 0;`))
+    expect(css).not.toMatch(/\.page-[a-z-]+ \.app-shell > \.app-header/)
   })
 })

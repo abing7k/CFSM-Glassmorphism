@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, provide, readonly, ref, watch } from 'vue'
+import { usePreferredReducedMotion } from '@vueuse/core'
+import { computed, provide, readonly, ref, watch, watchEffect } from 'vue'
 import { useRoute } from 'vue-router'
 import DynamicBackground from '@/components/dashboard/DynamicBackground.vue'
 import LoadingCover from '@/components/dashboard/LoadingCover.vue'
@@ -7,6 +8,7 @@ import TurnstileChallenge from '@/components/dashboard/TurnstileChallenge.vue'
 import AppToaster from '@/components/ui/AppToaster.vue'
 import { bootstrapKey, coldStartSettled, startBootstrapRequests, type EntryPage } from '@/domain/bootstrap'
 import { captureInjectedSiteTitle, injectedSiteTitleKey, type InjectedSiteTitle } from '@/domain/site-title'
+import { pageLeft, pageMotionEnabled, pageTransitionActive } from '@/router/navigation-motion'
 import { getApiBases } from '@/services/cfsm/config'
 import { useAppStore } from '@/stores/app'
 import { useServersStore } from '@/stores/servers'
@@ -30,6 +32,11 @@ const theme = useThemeSettingsStore()
 const route = useRoute()
 const coverVisible = ref(true)
 const entryDetailState = ref<DetailLoadState>('idle')
+const reducedMotion = usePreferredReducedMotion()
+
+watchEffect(() => {
+  pageMotionEnabled.value = !theme.runtime.disablePageAnimation && reducedMotion.value !== 'reduce'
+})
 let initialPageClaimed = false
 
 provide(bootstrapKey, {
@@ -92,6 +99,22 @@ watch(() => app.state, (state) => {
       <TurnstileChallenge v-if="app.turnstileSiteKey !== null" :key="app.turnstileSiteKey" :site-key="app.turnstileSiteKey" />
     </LoadingCover>
   </Transition>
-  <RouterView />
+  <!--
+    与 Komari App.vue 一致：首页由 KeepAlive 保留，返回时不重建、不重播卡片进场与数据加载；
+    页面内导航播放 out-in 换页过渡。浏览器历史导航不播，原因见 router/navigation-motion.ts。
+  -->
+  <RouterView v-slot="{ Component }">
+    <Transition
+      name="page"
+      :css="pageTransitionActive"
+      :mode="pageTransitionActive ? 'out-in' : 'default'"
+      :duration="{ enter: 300, leave: 150 }"
+      @after-leave="pageLeft"
+    >
+      <KeepAlive :include="['HomeView']">
+        <component :is="Component" />
+      </KeepAlive>
+    </Transition>
+  </RouterView>
   <AppToaster />
 </template>

@@ -15,7 +15,9 @@ describe('background application-level ownership', () => {
     ]
 
     expect(app.match(/<DynamicBackground\s*\/>/g)).toHaveLength(1)
-    expect(app.indexOf('<DynamicBackground />')).toBeLessThan(app.indexOf('<RouterView />'))
+    const routerView = app.indexOf('<RouterView')
+    expect(routerView).toBeGreaterThan(-1)
+    expect(app.indexOf('<DynamicBackground />')).toBeLessThan(routerView)
     for (const view of views) expect(view).not.toContain('DynamicBackground')
   })
 })

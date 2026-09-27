@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, inject, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, inject, onActivated, onMounted, onUnmounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useRouter } from 'vue-router'
 import AppHeader from '@/components/dashboard/AppHeader.vue'
@@ -41,6 +41,9 @@ import { injectedSiteTitleKey, injectedTitleForPrimary, resolveSiteTitle } from 
 import { configReady } from '@/domain/config-readiness'
 import type { DashboardSort, DashboardViewMode, GlassServer } from '@/types/glassmorphism'
 
+// App.vue 的 `KeepAlive :include="['HomeView']"` 按组件名匹配，与 Komari 一致。
+defineOptions({ name: 'HomeView' })
+
 const app = useAppStore()
 const serverStore = useServersStore()
 const preferences = useDashboardPreferencesStore()
@@ -58,8 +61,9 @@ const coldStartCover = bootstrap?.coverVisible ?? ref(false)
 const viewState = useDashboardViewStore()
 const { query, selectedGroup, sort, activeQuickFilter, advancedToolsVisible } = storeToRefs(viewState)
 const refreshing = ref(false)
+// Komari UI_CONFIG.motion：staggerMs 35、staggerLimit 12。
 const NODE_ITEM_DELAY_STYLES = Array.from({ length: 13 }, (_, index) => ({
-  '--node-item-delay': `${index * 34}ms`,
+  '--node-item-delay': `${index * 35}ms`,
 }))
 
 const siteTitleResolution = computed(() => resolveSiteTitle(
@@ -157,6 +161,8 @@ const quickCounts = computed<Partial<Record<QuickControlKey, number>>>(() => ({
   expiring: glassServers.value.filter((server) => isExpiring(server, theme.runtime.homeExpiringDays)).length,
 }))
 const isDenseCollection = computed(() => visibleServers.value.length >= 30)
+// Komari enableNodeCardTransition：关闭页面动画或卡片超过 30 张（denseNodeAppearThreshold）时不播进场过渡。
+const cardTransition = computed(() => !theme.runtime.disablePageAnimation && visibleServers.value.length <= 30)
 const showSource = computed(() => (
   app.apiBases.length > 1 || serverStore.collections.length > 1
 ))
@@ -195,6 +201,11 @@ watch(groups, (nextGroups) => {
 watch(siteTitle, (title) => {
   if (title) document.title = title
 }, { immediate: true })
+
+// KeepAlive 回到首页时组件不重建，上面的 watch 不会再执行，这里恢复被详情页改写的标题。
+onActivated(() => {
+  if (siteTitle.value) document.title = siteTitle.value
+})
 
 async function refreshRest(): Promise<void> {
   if (refreshing.value) return
@@ -488,8 +499,16 @@ onUnmounted(() => realtime.stop())
               </button>
             </div>
 
-            <div
+            <!--
+              与 Komari 一致：卡片进场用 TransitionGroup 的过渡，只在首次渲染与卡片加入列表时播放；
+              KeepAlive 重新插回页面时不会重播（CSS animation 会）。
+            -->
+            <TransitionGroup
               v-else-if="viewMode === 'card'"
+              :appear="cardTransition"
+              :css="cardTransition"
+              name="node-card-switch"
+              tag="div"
               :class="[
                 'server-grid',
                 `server-grid--size-${theme.runtime.nodeCardSize}`,
@@ -508,7 +527,7 @@ onUnmounted(() => realtime.stop())
                 @open="openServer(server)"
                 @toggle-favorite="preferences.toggleFavorite(server.key)"
               />
-            </div>
+            </TransitionGroup>
             <ServerList
               v-else
               :servers="visibleServers"

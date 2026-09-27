@@ -78,6 +78,9 @@
 | 37 | 无到期日付费节点的剩余信息 | 两行：`-` 与剩余价值；未知到期的剩余价值算成 0，显示「€0」 | v1.1.14 只画一行 `—` | 结构不一致 | **是**（第 10 条：未知剩余价值不写成 0） | v1.1.15 恢复两行结构：日历 `-`、硬币 `-` | P2 | NECESSARY-CFSM-DIFFERENCE |
 | 38 | Footer 样式 | `Footer.vue`：`p-4`，`text-xs`（12px / 16px）、`text-muted-foreground`，链接 `font-medium text-foreground`，悬停降低不透明度 | `.app-footer` 为 9px、`--faint` 色、`18px 2px 24px` 内边距，链接 680 字重、悬停变绿。9px 来自 2026-09-07 的早期改版，对照上游的 `3bb1501` 没有改动它 | 不一致 | 否（文字内容仍按矩阵 23 保留 CFSM 归因） | 按上游计算样式对齐：12px / 16px、`--muted`（即上游 `--muted-foreground`）、链接 500 字重的 `--ink`、`p-4` 与 `gap-4`、悬停不透明度 0.8，并删除三条移动端规则。唯一适配：CFSM 归因带版本号，比上游文字长，所以外层允许换行。手机宽度下右段整体移到下一行并左对齐，不在「Powered by」等词组中间折行；宽屏与上游完全一致。回归测试：`tests/footer-fidelity.test.ts` | P2 | PASS |
 | 39 | CFSM Turnstile 人机验证 | 上游没有人机验证流程。`LoadingCover.vue` 只显示加载动画与 Loading 文字；弹窗使用 AppDialog 的遮罩与面板 | v1.1.15 从不显示验证组件，开启全局 Turnstile 时所有数据请求被 CFSM 以 403 拒绝，页面无法加载 | 上游无对应功能 | **是**（第 6 条：CFSM JWT / Turnstile） | v1.1.16 在加载遮罩中渲染 Cloudflare 官方组件：<br>• 验证期间隐藏加载动画与文字，冷启动的遮罩保持上游样式<br>• 验证内容放在使用 AppDialog 面板 token 的面板中：`--dialog-surface`、`--dialog-border`、`--radius`、阴影与 24px 模糊<br>• 浏览中途重新验证时，遮罩改用 `.app-dialog__overlay` 的原值：`oklab(0 0 0 / 45%)` 与 `blur(2px)`<br>回归测试：`tests/turnstile.test.ts`、`tests/loading-cover.test.ts` | P2 | NECESSARY-CFSM-DIFFERENCE |
+| 40 | 首页保留、换页过渡与卡片进场 | `App.vue`：`RouterView` 外包 out-in 的 `Transition`（进入 300ms ease-out，自 opacity 0、`translate-y-2`；离开 150ms ease-in 至 opacity 0），内含 `KeepAlive(HomeView)`，`onActivated` 恢复首页滚动位置。卡片用 `TransitionGroup` 的 appear/enter，错开 35ms、上限 12 张；关闭页面动画或超过 30 张时不播 | v1.1.16 没有 `KeepAlive` 与换页过渡：<br>• 返回首页时整页重建，卡片重播 460ms 的 CSS 进场动画。手机手势返回时，浏览器截图之后卡片消失再浮现，形成抖动<br>• 同时重拉 REST、重建实时连接<br>• 关闭页面动画时卡片仍按 34ms 错开逐张出现<br>• 页面内的返回按钮回到页面顶部 | 不一致 | 否 | v1.1.17 候选按上游移植 `KeepAlive`、换页过渡数值与 `TransitionGroup` 的 enter 数值；页面内返回首页时恢复原位置。本主题的顶栏与页脚在页面组件内，过渡只作用于页面主体，看到的效果与上游一致。回归测试：`tests/page-motion.test.ts` | P1 | PASS |
+| 41 | 浏览器历史导航的换页过渡 | 所有路由切换都播放换页过渡，包括手势返回、返回键和前进 | 同矩阵 40 | 不一致 | 否（用户决定） | 浏览器历史导航不播换页过渡。手机浏览器在手势返回时已经用页面截图播放了自己的返回动画，页面再淡出淡入一次，会在截图之后多闪一下。页面内的点击导航照上游播放 | P2 | P2-ACCEPTED |
+| 42 | 切换分组或快捷筛选时的卡片动画 | 卡片 key 含分组与快捷筛选，切换时全部卡片离场（上移 6px、淡出）再依次重新进场；列表重排有 220ms 位移过渡 | 卡片 key 只含节点，切换时即时替换，只有新加入的卡片播放进场过渡；没有离场与位移动画 | 不一致 | 否 | 待定：可按上游把分组与快捷筛选加入 key，并移植离场与位移过渡 | P2 | FAIL |
 
 ## 第 13 轮：详情页专项审计
 
@@ -235,6 +238,20 @@ P2-ACCEPTED 2、NECESSARY-CFSM-DIFFERENCE 6）。矩阵 16 的结论相应更新
 
 未开启 Turnstile 的站点，加载遮罩与 v1.1.15 完全相同。验证记录见 `docs/v1.1.16-verification.md`。
 
+## v1.1.17 候选：首页保留与换页过渡
+
+- **矩阵 40**：手机从详情页手势返回首页时，浏览器先显示首页截图，随后首页被重建，卡片从透明重播进场动画，看上去是抖动。修复按上游移植：
+  - 首页由 `KeepAlive` 保留，返回时不重建，不重拉数据，也不重建实时连接；
+  - 卡片进场改为 `TransitionGroup` 的过渡，重新插回页面时不会重播；
+  - 页面内导航播放 out-in 换页过渡，滚动等旧页面淡出后再执行。
+
+  本地逐帧测量（390 宽、触屏模拟）：
+  - 浏览器返回后，卡片从第一帧起就是原元素，透明度为 1，也没有位移，滚动位置同帧恢复；
+  - 首页的 `subscribe=all` 连接在往返详情期间一直保持；
+  - 关闭页面动画时，卡片从出现的第一帧起完全可见。
+- **矩阵 41**：用户决定浏览器历史导航不播换页过渡，理由见表格。
+- **矩阵 42**：分组与快捷筛选切换的动画差异在本轮发现，未在本轮移植，保持 v1.1.16 的即时替换。
+
 ## 保留的 P2
 
 ## 保留的 P2
@@ -242,11 +259,12 @@ P2-ACCEPTED 2、NECESSARY-CFSM-DIFFERENCE 6）。矩阵 16 的结论相应更新
 - **矩阵 19（P2-ACCEPTED）**：主要 token 已按 Komari 尺度校准，余下逐处 shadow / blur 强度的细粒度差异源于 Tailwind 与手写 CSS 的实现方式不同，视觉影响极小，接受保留。
 - **矩阵 26（P2-ACCEPTED）**：高级工具是第 8 轮已落地、用户明确要求保留的 CFSM 能力，只让其沿用统一视觉 token，不重新设计 Komari 首页结构。
 - **矩阵 32（P2-ACCEPTED）**：累计流量卡面与上游一致；CFSM 数据缺失时仅在提示气泡里如实说明部分合计，保证手机窄卡的数值可见。
+- **矩阵 41（P2-ACCEPTED）**：浏览器历史导航不播换页过渡，由用户决定。手机浏览器已经用页面截图播放了返回动画，再播一次会在截图之后闪烁。
 
 ## 当前终态
 
-**P0 = 0 ｜ P1 = 0 ｜ FAIL = 0 ｜ P2-ACCEPTED = 3。**
-39 项审计的终态分布：PASS 29、NECESSARY-CFSM-DIFFERENCE 7、P2-ACCEPTED 3。
+**P0 = 0 ｜ P1 = 0 ｜ FAIL = 1（P2，矩阵 42）｜ P2-ACCEPTED = 4。**
+42 项审计的终态分布：PASS 30、NECESSARY-CFSM-DIFFERENCE 7、P2-ACCEPTED 4、FAIL 1。
 
 ## 数据真实性边界（不因保真而放宽）
 

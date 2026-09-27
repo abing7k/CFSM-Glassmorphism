@@ -130,9 +130,9 @@ describe('Komari fidelity contracts', () => {
       expect(viewStore).toContain(key)
     }
     expect(home).toContain('storeToRefs(viewState)')
-    // 浏览器返回时恢复原滚动位置。
-    expect(router).toContain('scrollBehavior')
-    expect(router).toContain('savedPosition ?? { top: 0 }')
+    // 浏览器返回时恢复原滚动位置；页面内导航回到首页时恢复离开首页时的位置（Komari onActivated）。
+    expect(router).toContain('scrollBehavior: pageScrollBehavior')
+    expect(source('../src/router/navigation-motion.ts')).toContain("savedPosition ?? { top: to.name === 'home' ? homeScrollTop : 0 }")
     // 这些是浏览状态，不得混入后端主题配置或本地覆盖，也不做任何持久化。
     expect(viewStore).not.toMatch(/localStorage\s*\./)
     expect(viewStore).not.toMatch(/sessionStorage\s*\./)

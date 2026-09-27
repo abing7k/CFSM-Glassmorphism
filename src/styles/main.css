@@ -424,6 +424,30 @@ a {
 .loading-cover-leave-to { opacity: 0; }
 
 /*
+ * 换页过渡：Komari App.vue 的 RouterView Transition 按计算值移植。
+ * 进入 `transition-all duration-300 ease-out` 自 `opacity-0 translate-y-2`，
+ * 离开 `transition-opacity duration-150 ease-in` 至 `opacity-0`，时长由 App.vue 的 `:duration` 给出。
+ * 上游的顶栏与页脚在 RouterView 之外、不参与过渡；本主题的顶栏与页脚在页面组件内，
+ * 所以只让页面主体过渡，看到的效果与上游一致。
+ */
+.page-enter-active .app-shell > main {
+  transition: all 300ms cubic-bezier(0, 0, 0.2, 1);
+}
+
+.page-enter-from .app-shell > main {
+  opacity: 0;
+  translate: 0 0.5rem;
+}
+
+.page-leave-active .app-shell > main {
+  transition: opacity 150ms cubic-bezier(0.4, 0, 1, 1);
+}
+
+.page-leave-to .app-shell > main {
+  opacity: 0;
+}
+
+/*
  * 默认背景：Komari `Background.vue` 的 `.default-background`，样式逐条移植。
  * 图片本身由组件用 Vite 资产 URL 注入 background-image，因此不写死路径。
  */
@@ -1458,8 +1482,44 @@ a {
   transition: box-shadow 200ms ease, background-color 200ms ease, transform 200ms ease;
   backdrop-filter: blur(14px) saturate(145%);
   -webkit-backdrop-filter: blur(14px) saturate(145%);
-  animation: node-enter 460ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
-  animation-delay: var(--node-item-delay, 0ms);
+}
+
+/*
+ * 卡片进场：Komari HomeView 的 node-card-switch（TransitionGroup）enter 逐项移植。
+ * 上游把过渡放在包裹卡片的 div 上；这里作用在卡片根元素，所以加 `.node-card` 提高优先级，
+ * 盖过卡片自身的悬停过渡。上游切换分组时整体重新进场（key 含分组），本主题的 key 不含分组，
+ * 离场与位移不做动画，切换筛选时保持即时替换。
+ */
+.node-card.node-card-switch-enter-active {
+  transition:
+    opacity 180ms ease,
+    transform 220ms cubic-bezier(0.22, 1, 0.36, 1),
+    filter 180ms ease;
+  transition-delay: var(--node-item-delay, 0ms);
+}
+
+.node-card.node-card-switch-enter-from {
+  opacity: 0;
+  transform: translateY(10px) scale(0.985);
+  filter: blur(3px);
+}
+
+.node-card.node-card-switch-leave-active,
+.node-card.node-card-switch-move {
+  transition: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .node-card.node-card-switch-enter-active {
+    transition: none;
+    transition-delay: 0ms;
+  }
+
+  .node-card.node-card-switch-enter-from {
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
 }
 
 .node-card:hover,
@@ -2206,7 +2266,6 @@ a {
   content-visibility: auto;
   contain: layout paint style;
   contain-intrinsic-size: 0 330px;
-  animation: none;
 }
 
 /*
@@ -2581,11 +2640,6 @@ a {
   margin: 0;
   overflow-wrap: anywhere;
   text-align: right;
-}
-
-@keyframes node-enter {
-  from { opacity: 0; filter: blur(3px); transform: translateY(10px) scale(0.988); }
-  to { opacity: 1; filter: blur(0); transform: translateY(0) scale(1); }
 }
 
 @keyframes node-ping {

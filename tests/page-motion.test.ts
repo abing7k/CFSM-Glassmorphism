@@ -1,0 +1,156 @@
+import { readFileSync } from 'node:fs'
+import { defineComponent } from 'vue'
+import { createMemoryHistory, createRouter, type RouteLocationNormalized, type Router } from 'vue-router'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import {
+  historyNavigation,
+  installNavigationMotion,
+  pageLeft,
+  pageMotionEnabled,
+  pageScrollBehavior,
+  pageTransitionActive,
+} from '@/router/navigation-motion'
+
+/*
+ * 手机从详情页手势返回首页时卡片会「抖动」：浏览器先显示首页截图，随后首页被重建、
+ * 卡片从透明重播进场动画。修复对齐 Komari App.vue：KeepAlive 保留首页、卡片进场改为
+ * TransitionGroup 的过渡（重新插回页面时不会重播）、页面内导航播放 out-in 换页过渡。
+ * 浏览器历史导航不再播放换页过渡，避免在浏览器自己的返回动画之后再闪一次。
+ */
+
+function source(path: string): string {
+  return readFileSync(new URL(path, import.meta.url), 'utf8').replace(/\r\n/g, '\n')
+}
+
+const Page = defineComponent({ render: () => null })
+
+function motionRouter(): Router {
+  const router = createRouter({
+    history: createMemoryHistory(),
+    routes: [
+      { path: '/', name: 'home', component: Page },
+      { path: '/server/:id', name: 'server-detail', component: Page },
+    ],
+  })
+  installNavigationMotion(router)
+  return router
+}
+
+function nextNavigation(router: Router): Promise<void> {
+  return new Promise((resolve) => {
+    const stop = router.afterEach(() => {
+      stop()
+      resolve()
+    })
+  })
+}
+
+function location(name: string, matched = 1): RouteLocationNormalized {
+  return { name, matched: Array.from({ length: matched }, () => ({})) } as unknown as RouteLocationNormalized
+}
+
+afterEach(() => {
+  pageMotionEnabled.value = true
+  historyNavigation.value = false
+  vi.unstubAllGlobals()
+})
+
+describe('导航分类', () => {
+  it('浏览器历史导航不播换页过渡，页面内导航照常播放', async () => {
+    const router = motionRouter()
+    await router.push('/')
+    await router.push('/server/a')
+    expect(historyNavigation.value).toBe(false)
+    expect(pageTransitionActive.value).toBe(true)
+
+    const back = nextNavigation(router)
+    router.back()
+    await back
+    expect(historyNavigation.value).toBe(true)
+    expect(pageTransitionActive.value).toBe(false)
+
+    await router.push('/server/b')
+    expect(historyNavigation.value).toBe(false)
+    expect(pageTransitionActive.value).toBe(true)
+  })
+
+  it('关闭页面动画时一律不播', () => {
+    pageMotionEnabled.value = false
+    expect(pageTransitionActive.value).toBe(false)
+  })
+})
+
+describe('滚动时机', () => {
+  it('初始导航、同一页面内切换与历史导航立即滚动', () => {
+    expect(pageScrollBehavior(location('home'), location('', 0), null)).toEqual({ top: 0 })
+    expect(pageScrollBehavior(location('server-detail'), location('server-detail'), null)).toEqual({ top: 0 })
+    historyNavigation.value = true
+    const saved = { left: 0, top: 900 }
+    expect(pageScrollBehavior(location('home'), location('server-detail'), saved)).toBe(saved)
+  })
+
+  it('播放换页过渡时等旧页面淡出后再滚动，新导航开始时放弃', async () => {
+    const waiting = pageScrollBehavior(location('server-detail'), location('home'), null)
+    expect(waiting).toBeInstanceOf(Promise)
+    pageLeft()
+    await expect(waiting).resolves.toEqual({ top: 0 })
+
+    const router = motionRouter()
+    await router.push('/')
+    const abandoned = pageScrollBehavior(location('server-detail'), location('home'), null)
+    await router.push('/server/a')
+    await expect(abandoned).resolves.toBe(false)
+  })
+
+  it('页面内导航回到首页时恢复离开首页时的位置', async () => {
+    vi.stubGlobal('window', { scrollY: 640 })
+    const router = motionRouter()
+    await router.push('/')
+    await router.push('/server/a')
+    pageMotionEnabled.value = false
+    expect(pageScrollBehavior(location('home'), location('server-detail'), null)).toEqual({ top: 640 })
+  })
+})
+
+describe('接线与样式', () => {
+  const app = source('../src/App.vue')
+  const home = source('../src/views/HomeView.vue')
+  const routerSource = source('../src/router/index.ts')
+  const css = source('../src/styles/main.css')
+
+  it('App 按上游保留首页并播放换页过渡', () => {
+    expect(app).toContain('<RouterView v-slot="{ Component }">')
+    expect(app).toContain('<KeepAlive :include="[\'HomeView\']">')
+    expect(app).toContain('name="page"')
+    expect(app).toContain(':css="pageTransitionActive"')
+    expect(app).toContain(':mode="pageTransitionActive ? \'out-in\' : \'default\'"')
+    expect(app).toContain(':duration="{ enter: 300, leave: 150 }"')
+    expect(app).toContain('@after-leave="pageLeft"')
+    expect(app).toContain("pageMotionEnabled.value = !theme.runtime.disablePageAnimation && reducedMotion.value !== 'reduce'")
+    expect(routerSource).toContain('scrollBehavior: pageScrollBehavior')
+    expect(routerSource).toContain('installNavigationMotion(router)')
+  })
+
+  it('首页可被 KeepAlive 匹配，返回时不重连、不重拉，只恢复标题', () => {
+    expect(home).toContain("defineOptions({ name: 'HomeView' })")
+    expect(home).toMatch(/onActivated\(\(\) => \{\n\s+if \(siteTitle\.value\) document\.title = siteTitle\.value\n\}\)/)
+    expect(home).not.toContain('onDeactivated')
+    expect(home).toContain('onUnmounted(() => realtime.stop())')
+  })
+
+  it('卡片进场改为 TransitionGroup，数值与上游一致', () => {
+    expect(home).toMatch(/<TransitionGroup\n\s+v-else-if="viewMode === 'card'"\n\s+:appear="cardTransition"\n\s+:css="cardTransition"\n\s+name="node-card-switch"/)
+    expect(home).toContain('const cardTransition = computed(() => !theme.runtime.disablePageAnimation && visibleServers.value.length <= 30)')
+    expect(home).toContain("'--node-item-delay': `${index * 35}ms`")
+    expect(css).not.toContain('node-enter')
+    expect(css).toMatch(/\.node-card\.node-card-switch-enter-active \{\n\s+transition:\n\s+opacity 180ms ease,\n\s+transform 220ms cubic-bezier\(0\.22, 1, 0\.36, 1\),\n\s+filter 180ms ease;\n\s+transition-delay: var\(--node-item-delay, 0ms\);/)
+    expect(css).toMatch(/\.node-card\.node-card-switch-enter-from \{\n\s+opacity: 0;\n\s+transform: translateY\(10px\) scale\(0\.985\);\n\s+filter: blur\(3px\);/)
+  })
+
+  it('换页过渡只作用于页面主体，数值与上游一致', () => {
+    expect(css).toMatch(/\.page-enter-active \.app-shell > main \{\n\s+transition: all 300ms cubic-bezier\(0, 0, 0\.2, 1\);/)
+    expect(css).toMatch(/\.page-enter-from \.app-shell > main \{\n\s+opacity: 0;\n\s+translate: 0 0\.5rem;/)
+    expect(css).toMatch(/\.page-leave-active \.app-shell > main \{\n\s+transition: opacity 150ms cubic-bezier\(0\.4, 0, 1, 1\);/)
+    expect(css).toMatch(/\.page-leave-to \.app-shell > main \{\n\s+opacity: 0;/)
+  })
+})

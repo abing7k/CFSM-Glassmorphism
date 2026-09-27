@@ -130,7 +130,7 @@ schema defaults
 - **Backend** 是跨设备共享的完整配置快照。
 - **Local** 只覆盖当前浏览器，必须可单独清除，不能显示成“已经保存到后端”。
 - `src/theme/site-theme-hint.ts` 另存非权威的上次站点明暗模式与自定义背景开关，不存背景地址；旧 v1 记录缺少背景字段时按未启用处理。它不参与三层合并，也不进入草稿、统计、复制 JSON 或保存快照。store 初始化即读取并应用；无暂存的明暗猜测恢复为未配置站点的 `preferred_theme=auto`，即跟随系统。确认配置后只以成功回读的后端模式及背景开关更新；冷启动失败时本次回到未配置站点的解析结果（旧暂存保留供下次访问），本地覆盖始终优先。
-- `DynamicBackground` 只在 `App.vue` 的 `<RouterView />` 外挂载一次；首页、详情与设置页切换不重建媒体状态机。`#app` 是背景 `z-index:-1` 的层叠上下文，各页面根容器保持透明。组件通过 `useBackgroundMedia` 执行 Komari `Background.vue` 的图片预加载、视频 `loadeddata` / `canplay` / `error`、默认/加载/回退/媒体四层显示条件与 0.8 秒淡入淡出。图片预加载及最终 `<img>` 都不发送 Referer。配置未确定且背景开关猜测为未启用时立即挂载默认图；猜测为启用时配置前及首张图加载期间留空，不请求默认图，图片失败才回退。首次访问无暂存的自定义背景站点则在图片加载期间保持默认图；配置明确失败或暂存过期也回退默认图。明暗切换换地址会重置预加载并在等待时显示默认图。遮罩和容器透明度作用于默认与自定义两种背景；没有新增 `/api` 请求。
+- `DynamicBackground` 只在 `App.vue` 的 `RouterView` 外挂载一次；首页、详情与设置页切换不重建媒体状态机。`#app` 是背景 `z-index:-1` 的层叠上下文，各页面根容器保持透明。组件通过 `useBackgroundMedia` 执行 Komari `Background.vue` 的图片预加载、视频 `loadeddata` / `canplay` / `error`、默认/加载/回退/媒体四层显示条件与 0.8 秒淡入淡出。图片预加载及最终 `<img>` 都不发送 Referer。配置未确定且背景开关猜测为未启用时立即挂载默认图；猜测为启用时配置前及首张图加载期间留空，不请求默认图，图片失败才回退。首次访问无暂存的自定义背景站点则在图片加载期间保持默认图；配置明确失败或暂存过期也回退默认图。明暗切换换地址会重置预加载并在等待时显示默认图。遮罩和容器透明度作用于默认与自定义两种背景；没有新增 `/api` 请求。
 - 保存后端时先把 defaults、当前 backend 和允许持久化的用户编辑合并为完整对象，再调用 `POST /api/theme_options`。
 - 本地专属状态（例如一次性 UI 展开状态、JWT、Turnstile 凭证）绝不混入后端快照。
 - 保存成功后以后端响应替换 backend 层；401/403/400 时保留草稿并显示准确动作。
@@ -147,7 +147,7 @@ schema defaults
 - 同一轮上报里的节点消息可能在约数百毫秒内分批抵达。首页按当前最快 `wss_report_interval` 的一半（限制为 250～1000ms）收齐这一轮消息，再跨 apiBase 原子提交一次；每条 sample 仍按原顺序 partial merge，不降采样、不平均，也不把 Agent 的 1～5 秒上报周期改成前端固定值。
 - 高频增量缺失字段是正常情况，不得覆盖已有值；显式存在的 probe `false`、`null`、`0` 与普通数字则必须更新对应单一字段。
 - 列表 ping/loss 窗口由 REST 补齐，详情实时字段与历史序列分别管理。
-- document 隐藏时主动关闭，可见时先 REST revalidate 再连接；unmount 时释放连接与计时器。
+- document 隐藏时主动关闭，可见时先 REST revalidate 再连接；unmount 时释放连接与计时器。首页由 `KeepAlive` 保留：进入详情或设置页时首页连接不关闭（详情另开 single-server 连接），返回首页时不重连、不重拉 REST，只有应用卸载时才释放。
 - 配置的连接时限到达后由用户选择继续或暂停；网络恢复采用单计时器指数退避，不会并发重连。
 - 连接不可用时以单个低频 REST 循环补偿；任何失败都继续展示最后一份真实快照及来源错误。
 - 五分钟在线阈值在 adapter/domain 层保持一致。
@@ -336,6 +336,14 @@ probe 三态、多 API Base、主题设置、Earth 三 renderer 与点击路径�
 - **Earth 与总览合为一个栅格**：`general-stage` 复刻 Komari `NodeGeneralCards` 的布局契约——球体渲染器在桌面端占右半、总览卡片占左半同一行，移动端卡片负边距上移叠加；tiled 改为卡片在上、整幅地图在下。
 - **主点击路径直达详情**：移除 `ServerQuickView` 强制中间层（组件已删除），节点卡片与列表行点击直接进入 `/#/server/:id` 并携带 owning `source`；收藏等独立控件保持 `stopPropagation`，多 apiBase 归属不变。
 - **首页往返状态**：新增会话级 `src/stores/dashboard-view.ts` 承载搜索、分组、排序与快捷筛选，`首页 → 详情 → 返回首页`不再重置；路由新增 `scrollBehavior` 以 `savedPosition` 恢复滚动位置。视图模式仍由主题设置层单独拥有，避免同一外观状态有两个写入者。
+- **首页保留与换页过渡**（Komari `App.vue`）：`RouterView` 外包 out-in 的 `Transition` 与 `KeepAlive(HomeView)`。
+  - 首页返回时不重建，卡片不重播进场，也不重连、不重拉数据；`onActivated` 恢复被详情页改写的网页标题。
+  - 卡片进场改为 `TransitionGroup` 的 enter 过渡，按上游数值移植；只在首次渲染和新卡片加入时播放，关闭页面动画或卡片超过 30 张时不播。
+  - `src/router/navigation-motion.ts` 区分导航来源：
+    - 浏览器历史导航（手势返回、返回键、前进）不播换页过渡，由浏览器自己的动画与页面截图接管；
+    - 页面内导航照上游播放，且滚动等旧页面淡出后再执行；
+    - 页面内导航回到首页时，恢复离开首页时的位置。
+  - 本主题的顶栏与页脚在页面组件内，所以过渡只作用于页面主体，效果与上游顶栏在路由外一致。
 - **发布护栏按真实构成重设**：`validate:dist` 体积预算改为 JS 2816 KiB / CSS 128 KiB / 总资源 6144 KiB；Komari RPC 残留扫描由裸 `common:` 收紧为字符串字面量正则，避免误判 three.js shader chunk 等第三方内部结构。
 
 本轮未完成的 P1/P2（总览卡片结构、NodeCard/NodeList 内部结构、echarts 图表族、详情页层级、图标与 UI 基元、间距校准、死 CSS 清理）在 `docs/fidelity-audit.md` 中逐条列出，不得视为已对齐。

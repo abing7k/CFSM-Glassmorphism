@@ -276,6 +276,14 @@ a {
   flex-direction: column;
 }
 
+/*
+ * Komari App.vue：`<main class="min-h-screen">` 之后才是页脚，页脚总在一屏之后。
+ * 此前内容较短（例如详情仍在加载、只有骨架）时，页脚会贴在首屏底部，先于内容映入眼帘。
+ */
+.app-shell > main {
+  min-height: 100vh;
+}
+
 .dynamic-background {
   position: fixed;
   inset: 0;

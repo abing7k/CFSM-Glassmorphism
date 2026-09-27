@@ -156,4 +156,9 @@ describe('接线与样式', () => {
     expect(css).toMatch(new RegExp(`${both('leave-to')}\\n\\s+opacity: 0;`))
     expect(css).not.toMatch(/\.page-[a-z-]+ \.app-shell > \.app-header/)
   })
+
+  it('页面主体至少一屏高，页脚总在一屏之后（Komari main.min-h-screen）', () => {
+    // 否则详情仍在加载、只有骨架时，页脚贴在首屏底部，看上去先于内容出现。
+    expect(css).toMatch(/\.app-shell > main \{\n\s+min-height: 100vh;\n\}/)
+  })
 })

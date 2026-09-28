@@ -3,7 +3,8 @@ name: Build
 on:
   push:
     branches:
-      - main
+      # 定制都在 my；main 只跟随上游，推送时无需重复跑这套质量门。
+      - my
   pull_request:
   workflow_dispatch:
 
@@ -42,9 +43,9 @@ jobs:
       - name: Validate dist
         run: bun run validate:dist
 
-      # dist/ 已提交进仓库，所以这里只校验「构建结果与已提交的产物一致」，
+      # dist/ 已提交进 my 分支，所以这里只校验「构建结果与已提交的产物一致」，
       # 避免源码改了却忘记重新编译、把过期产物推上去。
-      # 本 fork 使用单分支 + dist/ 子目录结构，CI 不再创建 theme-dist / preview-main。
+      # 本 fork 用 main 跟随上游 + my 承载定制，CI 不创建 theme-dist / preview-main。
       - name: Check committed dist is up to date
         shell: bash
         run: |

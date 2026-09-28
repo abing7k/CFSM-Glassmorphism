@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import type { DashboardViewMode } from '@/types/glassmorphism'
 import AppIcon from '@/components/ui/AppIcon.vue'
 import AppTabs from '@/components/ui/AppTabs.vue'
 import { ALL_GROUPS } from '@/domain/dashboard'
@@ -11,16 +10,15 @@ import type { IconName } from '@/constants/icons'
  * 对齐 Komari 首页控制行。
  *
  * 上游结构是「左侧可横向滚动的分组 Tabs + 快捷控制」与「右侧工具、
- * 卡片/列表切换、可折叠搜索框」两段，中间在 xl 断点才并排。
+ * 视图切换、可折叠搜索框」两段，中间在 xl 断点才并排。
  *
- * 视图切换只有卡片与列表两个按钮；卡片密度是主题设置 `nodeCardSize`，
- * 不出现在首页控制区。上游首页也没有排序下拉——列表排序由表头承担——
- * 因此这里同样不提供，避免多出上游没有的控件。
+ * 本 fork 只保留列表一种排布，因此控制区不再有卡片 / 列表切换按钮：
+ * 一个只剩单选项的开关没有意义，去掉后右侧留出更多空间给搜索框。
+ * 上游首页也没有排序下拉——列表排序由表头承担——因此这里同样不提供。
  */
 const props = defineProps<{
   query: string
   group: string
-  viewMode: DashboardViewMode
   groups: string[]
   quickControlsEnabled: boolean
   quickControlKeys: QuickControlKey[]
@@ -33,7 +31,6 @@ const props = defineProps<{
 const emit = defineEmits<{
   'update:query': [value: string]
   'update:group': [value: string]
-  'update:viewMode': [value: DashboardViewMode]
   'quickAction': [value: QuickControlKey]
   'toggleTools': []
 }>()
@@ -108,29 +105,6 @@ function clearSearch(): void {
           @click="emit('toggleTools')"
         >
           <AppIcon name="tabler:tools" :size="14" />
-        </button>
-      </div>
-
-      <div class="view-switch">
-        <button
-          type="button"
-          :class="{ 'is-active': viewMode === 'card' }"
-          :aria-pressed="viewMode === 'card'"
-          aria-label="卡片视图"
-          title="卡片视图"
-          @click="emit('update:viewMode', 'card')"
-        >
-          <AppIcon name="tabler:layout-grid" :size="14" />
-        </button>
-        <button
-          type="button"
-          :class="{ 'is-active': viewMode === 'list' }"
-          :aria-pressed="viewMode === 'list'"
-          aria-label="列表视图"
-          title="列表视图"
-          @click="emit('update:viewMode', 'list')"
-        >
-          <AppIcon name="tabler:table" :size="14" />
         </button>
       </div>
 

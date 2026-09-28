@@ -24,13 +24,10 @@ describe('release performance contracts', () => {
   it('preserves batch rendering, dense lazy paint and lazy route boundaries', () => {
     const home = source('../src/views/HomeView.vue')
     const list = source('../src/components/dashboard/ServerList.vue')
-    const stylesheet = source('../src/styles/main.css')
     const router = source('../src/router/index.ts')
 
     expect(home).toContain('glassServerMapper.map')
-    expect(home).toContain('NODE_ITEM_DELAY_STYLES')
     expect(list).toContain('v-memo=')
-    expect(stylesheet).toMatch(/\.server-grid--dense \.node-card\s*\{[^}]*content-visibility: auto/s)
     expect(router.match(/component: \(\) => import\(/g)).toHaveLength(3)
   })
 

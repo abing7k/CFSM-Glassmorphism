@@ -72,8 +72,32 @@ function onKeydown(event: KeyboardEvent, card: PresentationCard): void {
         <span class="overview-card__label">{{ card.label }}</span>
         <AppIcon class="overview-card__icon" :name="card.icon" :size="20" />
       </div>
+      <!--
+        多行读数（实时网速的上下行等）：每行「图标 + 数值 + 单位」等权排布，
+        字号与单位跨行一致，避免单行 baseline 方案里下行被当成单位、大小不一。
+      -->
       <AppTooltip
-        v-if="card.hint"
+        v-if="card.readings"
+        :content="card.hint"
+        placement="top"
+        as="div"
+        class="overview-card__value-slot"
+      >
+        <div class="overview-card__readings">
+          <span
+            v-for="reading in card.readings"
+            :key="reading.tone"
+            class="overview-card__reading"
+            :class="`overview-card__reading--${reading.tone}`"
+          >
+            <AppIcon class="overview-card__reading-icon" :name="reading.icon" :size="13" />
+            <span class="overview-card__reading-value">{{ reading.value }}</span>
+            <span class="overview-card__reading-unit">{{ reading.unit }}</span>
+          </span>
+        </div>
+      </AppTooltip>
+      <AppTooltip
+        v-else-if="card.hint"
         :content="card.hint"
         placement="top"
         as="div"

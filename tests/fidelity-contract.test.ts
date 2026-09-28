@@ -157,8 +157,7 @@ describe('Komari fidelity contracts', () => {
     const controls = source('../src/components/dashboard/DashboardControls.vue')
     const viewStore = source('../src/stores/dashboard-view.ts')
 
-    // 节点直接进入一层卡片/列表，不恢复 CFSM 中间实现的分组容器。
-    expect(home).toContain('v-for="(server, index) in visibleServers"')
+    // 节点直接进入一层列表，不恢复 CFSM 中间实现的分组容器。
     expect(home).toContain(':servers="visibleServers"')
     expect(home).not.toContain('groupedServers')
     expect(home).not.toContain('server-group')
@@ -206,9 +205,10 @@ describe('Komari fidelity contracts', () => {
     const controls = source('../src/components/dashboard/DashboardControls.vue')
     const stylesheet = source('../src/styles/main.css')
 
-    // 视图切换只有卡片与列表两个按钮，卡片密度是主题设置而非首页控件。
-    expect(controls).toContain('tabler:layout-grid')
-    expect(controls).toContain('tabler:table')
+    // 本 fork 只保留列表排布，控制区不再有卡片 / 列表切换按钮。
+    expect(controls).not.toContain('tabler:layout-grid')
+    expect(controls).not.toContain('view-switch')
+    expect(controls).not.toContain("'card'")
     expect(controls).not.toContain("'compact'")
     expect(controls).not.toContain("'mini'")
     // 上游首页没有排序下拉与结果计数。
@@ -237,16 +237,18 @@ describe('Komari fidelity contracts', () => {
     expect(stylesheet).toMatch(/\.server-grid--size-large\s*\{[^}]*gap: 20px/s)
   })
 
-  it('separates the view mode from the card density like upstream', () => {
+  it('只在列表里渲染节点，视图模式恒为 list', () => {
     const types = source('../src/types/glassmorphism.ts')
     const settings = source('../src/theme/settings.ts')
     const home = source('../src/views/HomeView.vue')
 
-    expect(types).toContain("export type DashboardViewMode = 'card' | 'list'")
-    // 切换 card/list 不得改写用户选择的卡片密度。
-    expect(settings).toContain("return { defaultViewMode: viewMode === 'list' ? 'list' : 'card' }")
-    expect(home).toContain(':density="theme.runtime.nodeCardSize"')
-    expect(home).toContain('`server-grid--size-${theme.runtime.nodeCardSize}`')
+    // 方格（卡片）视图已移除，类型收敛为单值联合。
+    expect(types).toContain("export type DashboardViewMode = 'list'")
+    expect(settings).toContain("return 'list'")
+    // 首页只渲染 ServerList，不再有卡片分支与卡片密度调用点。
+    expect(home).toContain('<ServerList')
+    expect(home).not.toContain('ServerCard')
+    expect(home).not.toContain('server-grid--size-')
   })
 
   /* 第 9.9 轮：表现层深度收敛。 */

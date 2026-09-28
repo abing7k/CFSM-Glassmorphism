@@ -425,6 +425,20 @@ function sum(values: Array<number | null>): number | null {
  * 主数值大字，单位小字并与主数值基线对齐；`hint` 此时是 tooltip 文本。
  * 详情页卡片结构已冻结，仍然把 `hint` 当作可见副文本。
  */
+/**
+ * 总览卡里的一个「方向读数」：图标 + 数值 + 单位 + 配色语义。
+ *
+ * 「实时网速」这类需要同时呈现上下行的卡片用它渲染成等权的两行，
+ * 而不是把下行塞进单位位（那样上行的数字会被挤到省略号，
+ * 且两行字号不同、看起来一个大一个小）。
+ */
+export interface CardReading {
+  readonly icon: IconName
+  readonly value: string
+  readonly unit: string
+  readonly tone: 'up' | 'down'
+}
+
 export interface PresentationCard {
   key: string
   icon: IconName
@@ -432,6 +446,8 @@ export interface PresentationCard {
   value: string
   hint: string
   unit?: string
+  /** 有该字段时按「多行读数」渲染，忽略 `value` / `unit` 的单行布局。 */
+  readings?: readonly CardReading[]
   /** 数值着色，对应 Komari 详情卡的 `valueClass`（目前只有剩余时间使用）。 */
   tone?: 'danger' | 'warning' | 'muted' | 'ok'
   percentage?: number | null
@@ -734,7 +750,22 @@ export function buildGeneralCards(
      * 这样三张卡（实时网速 / 本月流量 / 累计流量）在总览栅格里高度一致，也不会丢掉任何一项。
      * 上下行都没有采样（无在线节点上报）时不造卡，与原来两张卡的隐藏条件保持一致。
      */
-    realtimeSpeed: upload === null && download === null ? null : { key: 'realtimeSpeed', icon: 'tabler:arrows-transfer-up-down', label: '实时网速', value: `↑ ${formatDisplaySpeed(upload)}`, unit: `↓ ${formatDisplaySpeed(download)}`, hint: '在线节点合计' },
+    /*
+     * 「实时网速」用双行读数渲染：上行 / 下行各自独立成行，字号与单位一致，
+     * 不再把下行挤进单位位。这样两行的数字宽度接近，也不会出现 `↑ 183 K…` 的截断。
+     */
+    realtimeSpeed: upload === null && download === null ? null : {
+      key: 'realtimeSpeed',
+      icon: 'tabler:arrows-transfer-up-down',
+      label: '实时网速',
+      value: '',
+      unit: '',
+      hint: `↑ 上行 ${formatDisplaySpeed(upload)}\n↓ 下行 ${formatDisplaySpeed(download)}`,
+      readings: [
+        { icon: 'tabler:chevrons-up', value: uploadSplit.value, unit: uploadSplit.unit, tone: 'up' },
+        { icon: 'tabler:chevrons-down', value: downloadSplit.value, unit: downloadSplit.unit, tone: 'down' },
+      ],
+    },
     uploadSpeed: upload === null ? null : { key: 'uploadSpeed', icon: 'tabler:chevrons-up', label: '实时上行', value: uploadSplit.value, unit: uploadSplit.unit, hint: '在线节点合计' },
     downloadSpeed: download === null ? null : { key: 'downloadSpeed', icon: 'tabler:chevrons-down', label: '实时下行', value: downloadSplit.value, unit: downloadSplit.unit, hint: '在线节点合计' },
     onlineNodes: { key: 'onlineNodes', icon: 'tabler:activity-heartbeat', label: '在线节点', value: formatCount(online.length), unit: `/ ${formatCount(servers.length)}`, hint: `${offlineCount} 台离线` },

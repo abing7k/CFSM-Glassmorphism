@@ -138,13 +138,13 @@ describe('接线与样式', () => {
     expect(home).toContain('onUnmounted(() => realtime.stop())')
   })
 
-  it('卡片进场改为 TransitionGroup，数值与上游一致', () => {
-    expect(home).toMatch(/<TransitionGroup\n\s+v-else-if="viewMode === 'card'"\n\s+:appear="cardTransition"\n\s+:css="cardTransition"\n\s+name="node-card-switch"/)
-    expect(home).toContain('const cardTransition = computed(() => !theme.runtime.disablePageAnimation && visibleServers.value.length <= 30)')
-    expect(home).toContain("'--node-item-delay': `${index * 35}ms`")
+  it('首页只渲染列表，方格视图与它的进场过渡一并移除', () => {
+    // 方格（卡片）视图已按使用需求删除：首页只剩列表一条渲染分支。
+    expect(home).not.toContain('TransitionGroup')
+    expect(home).not.toContain('cardTransition')
+    expect(home).not.toContain('viewMode')
+    expect(home).toContain('<ServerList')
     expect(css).not.toContain('node-enter')
-    expect(css).toMatch(/\.node-card\.node-card-switch-enter-active \{\n\s+transition:\n\s+opacity 180ms ease,\n\s+transform 220ms cubic-bezier\(0\.22, 1, 0\.36, 1\),\n\s+filter 180ms ease;\n\s+transition-delay: var\(--node-item-delay, 0ms\);/)
-    expect(css).toMatch(/\.node-card\.node-card-switch-enter-from \{\n\s+opacity: 0;\n\s+transform: translateY\(10px\) scale\(0\.985\);\n\s+filter: blur\(3px\);/)
   })
 
   it('换页过渡作用于页面主体与页脚，顶栏不动，数值与上游一致', () => {

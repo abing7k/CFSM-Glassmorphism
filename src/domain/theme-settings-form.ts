@@ -57,18 +57,6 @@ const THEME_MODE_OPTIONS: readonly ThemeFieldOption[] = [
   { value: 'dark', label: '深色' },
 ]
 
-const VIEW_MODE_OPTIONS: readonly ThemeFieldOption[] = [
-  { value: 'card', label: '卡片' },
-  { value: 'list', label: '列表' },
-]
-
-const CARD_SIZE_OPTIONS: readonly ThemeFieldOption[] = [
-  { value: 'mini', label: '迷你' },
-  { value: 'compact', label: '紧凑' },
-  { value: 'comfortable', label: '舒适' },
-  { value: 'large', label: '宽松' },
-]
-
 const EARTH_RENDERER_OPTIONS: readonly ThemeFieldOption[] = [
   { value: 'realistic', label: '贴图地球' },
   { value: 'cobe', label: '点阵地球' },
@@ -118,21 +106,6 @@ export const THEME_SETTINGS_FORM: readonly ThemeFieldGroup[] = [
         unit: '秒',
         help: '只在 WebSocket 不可用时生效，是 REST 回退轮询的间隔。',
         note: '实时数据由服务端通过 WebSocket 推送，节奏跟随站点自己的上报配置，主题改不了；本项不影响它。回退轮询每跳一次要重取站点配置与节点列表，因此下限为 5 秒。',
-      },
-      {
-        key: 'defaultViewMode',
-        label: '默认视图模式',
-        kind: 'select',
-        options: VIEW_MODE_OPTIONS,
-        help: '节点列表的默认显示模式。',
-      },
-      {
-        key: 'nodeCardSize',
-        label: '节点卡片尺寸',
-        kind: 'select',
-        options: CARD_SIZE_OPTIONS,
-        help: '从高密度迷你到宽松，默认紧凑。',
-        enabled: (settings) => settings.defaultViewMode !== 'list',
       },
     ],
   },

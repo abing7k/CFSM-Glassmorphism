@@ -558,13 +558,21 @@ export function validateThemeSettingsDraft(value: ThemeSettings): ThemeDraftIssu
   return issues
 }
 
-/** 视图模式与卡片密度互相独立：切换 card/list 不应改写用户选择的 `nodeCardSize`。 */
+/**
+ * 首页只保留列表排布，因此视图模式恒为 `list`。
+ *
+ * 保留这个函数（而不是让调用点直接写 `'list'`）是为了：
+ * 历史配置里存过 `card`，读取时仍然要能安全落到列表；
+ * 卡片密度 `nodeCardSize` 属于主题设置，与排布无关，不受这里影响。
+ */
 export function dashboardViewMode(settings: ThemeSettings): DashboardViewMode {
-  return settings.defaultViewMode === 'list' ? 'list' : 'card'
+  // 历史上 `defaultViewMode` 允许 `card`；现在一律按列表渲染。
+  void settings
+  return 'list'
 }
 
 export function dashboardViewPatch(viewMode: DashboardViewMode): Pick<ThemeSettings, 'defaultViewMode'> {
-  return { defaultViewMode: viewMode === 'list' ? 'list' : 'card' }
+  return { defaultViewMode: viewMode }
 }
 
 export function resolveThemeMode(

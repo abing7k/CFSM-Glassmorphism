@@ -15,7 +15,9 @@ import { cloneThemeSettings, DEFAULT_THEME_SETTINGS, resolveThemeMode, THEME_SET
 const UPSTREAM_GROUPS: ReadonlyArray<{ title: string, keys: readonly string[] }> = [
   {
     title: '01 · 基础与外观',
-    keys: ['themeMode', 'dataUpdateInterval', 'defaultViewMode', 'nodeCardSize'],
+    // 本 fork 只保留列表排布，`defaultViewMode` / `nodeCardSize` 已从设置页移除：
+    // 前者恒为列表，后者只作用于已删除的方格视图。
+    keys: ['themeMode', 'dataUpdateInterval'],
   },
   {
     title: '02 · 首页布局',
@@ -67,7 +69,15 @@ const UPSTREAM_GROUPS: ReadonlyArray<{ title: string, keys: readonly string[] }>
  * 它们仍留在 48 项 schema 与保存快照中——保存协议要求发送完整对象。
  * 正式版待办见 `docs/todo.md` TODO-02。
  */
-const BACKLOG_KEYS: readonly string[] = ['rpcTransportMode', 'visitorInfoEnabled']
+const BACKLOG_KEYS: readonly string[] = [
+  'rpcTransportMode',
+  'visitorInfoEnabled',
+  // 方格（卡片）视图移除后，这两项不再出现在设置页：
+  // `defaultViewMode` 恒为列表，`nodeCardSize` 只作用于已删除的视图。
+  // 它们仍留在 schema 与保存快照中，老配置升级时不会丢字段。
+  'defaultViewMode',
+  'nodeCardSize',
+]
 
 describe('设置页字段注册表与上游清单一致', () => {
   it('分组标题与顺序逐条对应 komari-theme.json', () => {
@@ -124,10 +134,6 @@ describe('设置页字段注册表与上游清单一致', () => {
     expect(isFieldEnabled(field('alertTitle'), settings)).toBe(false)
     settings.alertEnabled = true
     expect(isFieldEnabled(field('alertTitle'), settings)).toBe(true)
-
-    expect(isFieldEnabled(field('nodeCardSize'), settings)).toBe(true)
-    settings.defaultViewMode = 'list'
-    expect(isFieldEnabled(field('nodeCardSize'), settings)).toBe(false)
 
     expect(isFieldEnabled(field('diskPredictionThresholdDays'), settings)).toBe(false)
     settings.diskPredictionEnabled = true

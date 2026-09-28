@@ -1,3 +1,13 @@
+<!--
+  首页方格（卡片）视图已按使用需求移除，首页只渲染 `ServerList`。
+  这个组件因此**不再被任何页面引用**，保留它是为了让下面这些共享能力继续有归属与回归：
+  - 首页节点的进度条阈值、流量配色、延迟 / 丢包迷你柱的取值口径；
+  - 到期日与剩余价值的格式化（`node-box__row--remaining` 等）；
+  - `data/` 层与表现层之间的字段契约（多个合约测试直接读这个文件）。
+
+  想恢复方格视图时，把 `HomeView.vue` 里的列表分支改回按 `viewMode` 二选一，
+  并把 `DashboardControls` 的切换按钮加回来即可；样式仍然完整保留在 `main.css`。
+-->
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { GlassServer } from '@/types/glassmorphism'

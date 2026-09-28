@@ -138,8 +138,15 @@ describe('总览卡片对齐 Komari NodeGeneralCards', () => {
 
     expect(cards[0]).toMatchObject({ key: 'totalTraffic', label: '累计流量', value: '4.0', unit: 'GB' })
     expect(cards[0]?.hint).toBe('↑ 1.0 GB\n↓ 3.0 GB')
-    // 「实时网速」把上下行合成一张卡：主数值是上行，单位行是下行。
-    expect(cards[1]).toMatchObject({ key: 'realtimeSpeed', label: '实时网速', value: '↑ 2.0 MB/s', unit: '↓ 1.0 MB/s' })
+    /*
+     * 「实时网速」把上下行合成一张卡，用等权的两行读数渲染：
+     * 上行 / 下行各自是「数值 + 单位」的一组，字号一致，不再出现一个大一个小。
+     */
+    expect(cards[1]).toMatchObject({ key: 'realtimeSpeed', label: '实时网速' })
+    expect(cards[1]?.readings).toEqual([
+      { icon: 'tabler:chevrons-up', value: '2.0', unit: 'MB/s', tone: 'up' },
+      { icon: 'tabler:chevrons-down', value: '1.0', unit: 'MB/s', tone: 'down' },
+    ])
   })
 
   it('单独列出上行或下行时不会被合并，两者相邻时收敛成实时网速', () => {

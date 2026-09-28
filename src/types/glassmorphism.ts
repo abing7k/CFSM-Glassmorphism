@@ -95,11 +95,13 @@ export interface GlassServer {
 }
 
 /**
- * 首页视图模式只有卡片与列表两种，与 Komari `appStore.nodeViewMode` 一致。
- * 卡片的密度（mini / compact / comfortable / large）是独立的主题设置
- * `nodeCardSize`，不折叠进视图模式，否则首页控制区会多出上游没有的按钮。
+ * 首页节点只保留列表一种排布。
+ *
+ * 原先的方格（卡片）视图已按使用需求移除：列表在同样宽度下能承载更多列
+ * （实时网速 / 本月流量 / 总流量），信息密度更高，也不需要维护两套渲染分支。
+ * 类型保留为单值联合，避免调用点散落 `'list'` 字面量。
  */
-export type DashboardViewMode = 'card' | 'list'
+export type DashboardViewMode = 'list'
 export type DashboardThemeMode = 'system' | 'light' | 'dark'
 export type DashboardSort = 'order' | 'name' | 'status' | 'cpu' | 'memory' | 'network'
   | 'traffic' | 'upload' | 'download' | 'peak'

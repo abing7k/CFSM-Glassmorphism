@@ -7,7 +7,6 @@ import AdvancedTools from '@/components/dashboard/AdvancedTools.vue'
 import DashboardControls from '@/components/dashboard/DashboardControls.vue'
 import EarthMap from '@/components/dashboard/EarthMap.vue'
 import OverviewCards from '@/components/dashboard/OverviewCards.vue'
-import ServerCard from '@/components/dashboard/ServerCard.vue'
 import ServerList from '@/components/dashboard/ServerList.vue'
 import AppIcon from '@/components/ui/AppIcon.vue'
 import {
@@ -39,7 +38,7 @@ import { parseSettingKeys } from '@/theme/settings'
 import { bootstrapKey } from '@/domain/bootstrap'
 import { injectedSiteTitleKey, injectedTitleForPrimary, resolveSiteTitle } from '@/domain/site-title'
 import { configReady } from '@/domain/config-readiness'
-import type { DashboardSort, DashboardViewMode, GlassServer } from '@/types/glassmorphism'
+import type { DashboardSort, GlassServer } from '@/types/glassmorphism'
 
 // App.vue 的 `KeepAlive :include="['HomeView']"` 按组件名匹配，与 Komari 一致。
 defineOptions({ name: 'HomeView' })
@@ -61,11 +60,6 @@ const coldStartCover = bootstrap?.coverVisible ?? ref(false)
 const viewState = useDashboardViewStore()
 const { query, selectedGroup, sort, activeQuickFilter, advancedToolsVisible } = storeToRefs(viewState)
 const refreshing = ref(false)
-// Komari UI_CONFIG.motion：staggerMs 35、staggerLimit 12。
-const NODE_ITEM_DELAY_STYLES = Array.from({ length: 13 }, (_, index) => ({
-  '--node-item-delay': `${index * 35}ms`,
-}))
-
 const siteTitleResolution = computed(() => resolveSiteTitle(
   app.config?.siteTitle,
   app.config === null && (app.state === 'idle' || app.state === 'loading'),
@@ -74,10 +68,6 @@ const siteTitleResolution = computed(() => resolveSiteTitle(
 const siteTitle = computed(() => siteTitleResolution.value.title)
 const siteTitlePending = computed(() => siteTitleResolution.value.state === 'pending')
 const siteConfigReady = computed(() => configReady(app.config, app.state))
-const viewMode = computed({
-  get: () => theme.viewMode,
-  set: (value: DashboardViewMode) => theme.setDashboardViewMode(value),
-})
 const visibleAdminUrl = computed(() => (
   !siteConfigReady.value || (theme.runtime.hideAdminEntryWhenLoggedOut && app.config?.authorization !== true)
     ? null
@@ -160,9 +150,6 @@ const quickCounts = computed<Partial<Record<QuickControlKey, number>>>(() => ({
   highLoad: glassServers.value.filter((server) => isHighLoad(server, theme.runtime.homeHighLoadThreshold)).length,
   expiring: glassServers.value.filter((server) => isExpiring(server, theme.runtime.homeExpiringDays)).length,
 }))
-const isDenseCollection = computed(() => visibleServers.value.length >= 30)
-// Komari enableNodeCardTransition：关闭页面动画或卡片超过 30 张（denseNodeAppearThreshold）时不播进场过渡。
-const cardTransition = computed(() => !theme.runtime.disablePageAnimation && visibleServers.value.length <= 30)
 const showSource = computed(() => (
   app.apiBases.length > 1 || serverStore.collections.length > 1
 ))
@@ -244,10 +231,6 @@ function openServer(server: GlassServer): void {
     server.sourceBase,
     hasMultipleSources(app.apiBases),
   ))
-}
-
-function cardStyle(index: number): Record<string, string> {
-  return NODE_ITEM_DELAY_STYLES[Math.min(index, 12)] ?? NODE_ITEM_DELAY_STYLES[0] ?? {}
 }
 
 function quickAction(key: QuickControlKey): void {
@@ -472,7 +455,6 @@ onUnmounted(() => realtime.stop())
             <DashboardControls
               v-model:query="query"
               v-model:group="selectedGroup"
-              v-model:view-mode="viewMode"
               :groups="groups"
               :quick-controls-enabled="theme.runtime.homeQuickControlsEnabled"
               :quick-control-keys="quickControlKeys"
@@ -499,37 +481,8 @@ onUnmounted(() => realtime.stop())
               </button>
             </div>
 
-            <!--
-              与 Komari 一致：卡片进场用 TransitionGroup 的过渡，只在首次渲染与卡片加入列表时播放；
-              KeepAlive 重新插回页面时不会重播（CSS animation 会）。
-            -->
-            <TransitionGroup
-              v-else-if="viewMode === 'card'"
-              :appear="cardTransition"
-              :css="cardTransition"
-              name="node-card-switch"
-              tag="div"
-              :class="[
-                'server-grid',
-                `server-grid--size-${theme.runtime.nodeCardSize}`,
-                { 'server-grid--dense': isDenseCollection },
-              ]"
-            >
-              <ServerCard
-                v-for="(server, index) in visibleServers"
-                :key="server.key"
-                :server="server"
-                :show-source="showSource"
-                :density="theme.runtime.nodeCardSize"
-                :favorite="preferences.isFavorite(server.key)"
-                :price-visible="priceVisible"
-                :style="cardStyle(index)"
-                @open="openServer(server)"
-                @toggle-favorite="preferences.toggleFavorite(server.key)"
-              />
-            </TransitionGroup>
+            <!-- 只保留列表排布：方格（卡片）视图已按使用需求移除。 -->
             <ServerList
-              v-else
               :servers="visibleServers"
               :show-source="showSource"
               :favorite-keys="preferences.favorites"

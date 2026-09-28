@@ -1,7 +1,6 @@
 import { createSSRApp } from 'vue'
 import { renderToString } from 'vue/server-renderer'
 import { describe, expect, it } from 'vitest'
-import ServerCard from '@/components/dashboard/ServerCard.vue'
 import ServerList from '@/components/dashboard/ServerList.vue'
 import { trafficDisplay, trafficHeadText, trafficRatioText } from '@/domain/theme-presentation'
 import type { GlassServer } from '@/types/glassmorphism'
@@ -100,15 +99,6 @@ describe('节点流量显示口径', () => {
   })
 })
 
-async function cardTraffic(overrides: Partial<GlassServer>, density: 'comfortable' | 'mini') {
-  const html = await renderToString(createSSRApp(ServerCard, {
-    server: server(overrides), showSource: false, density, favorite: false, priceVisible: true,
-  }))
-  const match = /node-metric__label--traffic[\s\S]*?<span class="node-metric__value[^"]*">([^<]*)<\/span>[\s\S]*?<div class="node-metric__hint[^"]*">([^<]*)<\/div>/.exec(html)
-  expect(match).not.toBeNull()
-  return { head: match?.[1]?.trim() ?? '', hint: match?.[2]?.trim() ?? '' }
-}
-
 async function listValues(overrides: Partial<GlassServer>): Promise<string[]> {
   const html = await renderToString(createSSRApp(ServerList, {
     servers: [server(overrides)], showSource: false, favoriteKeys: new Set<string>(),
@@ -129,24 +119,11 @@ async function listTotalTraffic(overrides: Partial<GlassServer>): Promise<string
   return (await listValues(overrides))[4] ?? ''
 }
 
-describe('节点卡片与节点列表的流量格', () => {
-  it.each(['comfortable', 'mini'] as const)('卡片（%s）：不限流量显示已用量 / ∞', async (density) => {
-    expect(await cardTraffic({}, density)).toEqual({ head: '∞', hint: '4.0 GB / ∞' })
-  })
-
-  it.each(['comfortable', 'mini'] as const)('卡片（%s）：有上限但已用量未知时不出现「∞」', async (density) => {
-    const traffic = await cardTraffic({ trafficLimit: '550.0', ...withMonthly(null, null) }, density)
-    expect(traffic).toEqual({ head: '-', hint: '- / 550.0 GB' })
-  })
-
-  it.each(['comfortable', 'mini'] as const)('卡片（%s）：站点关闭流量展示时不呈现数值', async (density) => {
-    const traffic = await cardTraffic({ showTraffic: false, trafficLimit: '550.0' }, density)
-    expect(traffic).toEqual({ head: '-', hint: '- / -' })
-  })
-
+describe('节点列表的流量格', () => {
   /*
    * 列表改成「本月流量 / 总流量」两列后，两列都直接呈现真实字节数，
-   * 不再复用卡片的百分比口径；缺失时统一给占位符。
+   * 不再复用旧的百分比口径；缺失时统一给占位符。
+   * 方格（卡片）视图已移除，因此这里只覆盖列表。
    */
   it('列表：本月流量读月度计数，总流量读网卡累计计数', async () => {
     // 默认 fixture 只有月度计数（3 GiB 下行 + 1 GiB 上行）。

@@ -1047,6 +1047,65 @@ a {
   -webkit-backdrop-filter: blur(8px);
 }
 
+/*
+ * 实时网速的两行读数：上下行等权，图标 / 数值 / 单位三者基线对齐。
+ * 上下行分别用 emerald 与 blue 着色，与节点列表的「实时网速」列同一套语义。
+ */
+.overview-card__readings {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.overview-card__reading {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: 5px;
+}
+
+.overview-card__reading-icon {
+  flex: none;
+  align-self: center;
+}
+
+.overview-card__reading--up .overview-card__reading-icon {
+  color: var(--emerald);
+}
+
+.overview-card__reading--down .overview-card__reading-icon {
+  color: var(--blue);
+}
+
+.overview-card__reading-value {
+  overflow: hidden;
+  min-width: 0;
+  color: var(--ink);
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -0.025em;
+  font-variant-numeric: tabular-nums;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.overview-card__reading-unit {
+  flex: none;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+@media (min-width: 768px) {
+  .overview-card__reading-value {
+    font-size: 19px;
+  }
+}
+
 .overview-card:hover {
   z-index: 2;
   background: var(--background);
@@ -1163,6 +1222,51 @@ a {
     font-size: 12px;
     line-height: 16px;
   }
+}
+
+/*
+ * 三张卡（实时网速 / 本月流量 / 累计流量）并排时的排版。
+ *
+ * 球体版把卡片撑到与球体同高（约 232px），每张只有约 1/3 宽度：
+ * 上游的两行栅格让每张卡约 108px 高，`space-between` 正好合适；
+ * 改成一行之后卡高翻倍，再贴顶贴底就会在中间留出一大块空白，像三个空盒子。
+ *
+ * 因此这里把「标签 + 数值」当成一整组垂直居中：图标留在右上角，
+ * 其余内容落在视觉中心，卡片看起来是被内容填满的，而不是被拉长的。
+ * 数值同时升一档字号，200px 的卡高下有足够的存在感。
+ */
+.general-stage--globe:has(.overview-card:nth-child(3)):not(:has(.overview-card:nth-child(4))) .overview-card {
+  gap: 8px;
+  justify-content: flex-start;
+  padding: 16px 18px;
+  border-radius: calc(var(--radius) + 2px);
+  box-shadow: inset 0 1px rgb(255 255 255 / 8%);
+}
+
+.general-stage--globe:has(.overview-card:nth-child(3)):not(:has(.overview-card:nth-child(4))) .overview-card__head {
+  align-items: center;
+}
+
+/* 数值组在「图标行」与卡底之间居中，上下各留一半弹性空白。 */
+.general-stage--globe:has(.overview-card:nth-child(3)):not(:has(.overview-card:nth-child(4))) .overview-card__value-slot,
+.general-stage--globe:has(.overview-card:nth-child(3)):not(:has(.overview-card:nth-child(4))) .overview-card__value {
+  margin-block: auto;
+}
+
+.general-stage--globe:has(.overview-card:nth-child(3)):not(:has(.overview-card:nth-child(4))) .overview-card__number {
+  font-size: 28px;
+}
+
+/*
+ * 「实时网速」是两行读数，行距留够；数值与「本月流量」同一档字号，
+ * 避免上行大、下行小。
+ */
+.general-stage--globe:has(.overview-card:nth-child(3)):not(:has(.overview-card:nth-child(4))) .overview-card__readings {
+  gap: 6px;
+}
+
+.general-stage--globe:has(.overview-card:nth-child(3)):not(:has(.overview-card:nth-child(4))) .overview-card__reading-value {
+  font-size: 22px;
 }
 
 .settings-field small,
@@ -2275,12 +2379,6 @@ a {
   background: var(--line-strong);
 }
 
-.server-grid--dense .node-card {
-  content-visibility: auto;
-  contain: layout paint style;
-  contain-intrinsic-size: 0 330px;
-}
-
 /*
  * Round 9.9: 节点列表对齐 Komari NodeList。
  * 与上游一致采用栅格行而非 <table>，列宽固定为
@@ -2613,11 +2711,20 @@ a {
 }
 
 .skeleton-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 6px;
   margin-top: 14px;
 }
 
+/*
+ * 加载骨架与真实内容同形：方格（卡片）视图已移除，
+ * 骨架改成列表行的高度与间距，加载完成后的切换不会发生跳动。
+ */
 .skeleton--card {
-  min-height: 320px;
+  height: 68px;
+  min-height: 68px;
+  border-radius: 8px;
 }
 
 /*

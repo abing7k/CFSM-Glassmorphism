@@ -1355,8 +1355,7 @@ a {
   -webkit-backdrop-filter: blur(18px);
 }
 
-.quick-controls button,
-.view-switch button {
+.quick-controls button {
   border: 0;
   color: var(--muted);
   background: transparent;
@@ -1391,8 +1390,7 @@ a {
  * 以免多一层无用的合成层。
  */
 .group-tabs .app-tabs__trigger:hover,
-.quick-controls button:hover,
-.view-switch button:hover {
+.quick-controls button:hover {
   color: var(--ink);
 }
 
@@ -1404,7 +1402,6 @@ a {
   -webkit-backdrop-filter: blur(14px) saturate(145%);
 }
 
-.view-switch button.is-active,
 .group-tabs .app-tabs__trigger[data-state='active'] {
   color: var(--selection);
   background: var(--background);
@@ -1468,8 +1465,7 @@ a {
   gap: 7px;
 }
 
-.search-field,
-.view-switch {
+.search-field {
   border: 1px solid var(--glass-border);
   background: var(--glass-soft);
   backdrop-filter: blur(16px);
@@ -1519,25 +1515,7 @@ a {
   color: var(--faint);
 }
 
-.view-switch {
-  display: flex;
-  height: 32px;
-  align-items: center;
-  gap: 2px;
-  padding: 3px;
-  border: 0;
-  border-radius: 6px;
-}
 
-.view-switch button {
-  display: grid;
-  width: 26px;
-  height: 26px;
-  place-items: center;
-  border-radius: 4px;
-  font-size: 16px;
-  line-height: 1;
-}
 
 /*
  * 节点网格对齐 Komari 的 nodeCardGridClass：

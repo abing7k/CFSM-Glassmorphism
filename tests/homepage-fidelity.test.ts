@@ -133,13 +133,35 @@ describe('总览卡片对齐 Komari NodeGeneralCards', () => {
           monthlyReceived: null, monthlyTransmitted: null,
         },
       })],
-      customGeneral('totalTraffic\nuploadSpeed\ndownloadSpeed'),
+      customGeneral('totalTraffic\nrealtimeSpeed'),
     )
 
     expect(cards[0]).toMatchObject({ key: 'totalTraffic', label: '累计流量', value: '4.0', unit: 'GB' })
     expect(cards[0]?.hint).toBe('↑ 1.0 GB\n↓ 3.0 GB')
-    expect(cards[1]).toMatchObject({ key: 'uploadSpeed', label: '实时上行', value: '2.0', unit: 'MB/s' })
-    expect(cards[2]).toMatchObject({ key: 'downloadSpeed', label: '实时下行', value: '1.0', unit: 'MB/s' })
+    // 「实时网速」把上下行合成一张卡：主数值是上行，单位行是下行。
+    expect(cards[1]).toMatchObject({ key: 'realtimeSpeed', label: '实时网速', value: '↑ 2.0 MB/s', unit: '↓ 1.0 MB/s' })
+  })
+
+  it('单独列出上行或下行时不会被合并，两者相邻时收敛成实时网速', () => {
+    const servers = [glass({
+      memory: { used: 1, total: 2, percentage: 50 },
+      network: {
+        inSpeed: 1024 ** 2, outSpeed: 2 * 1024 ** 2,
+        received: 1, transmitted: 1, monthlyReceived: 1, monthlyTransmitted: 1,
+      },
+    })]
+
+    // 相邻的上下行合并成一张卡，位置取靠前的一个。
+    expect(buildGeneralCards(servers, customGeneral('memory\nuploadSpeed\ndownloadSpeed'))
+      .map((card) => card.key)).toEqual(['memory', 'realtimeSpeed'])
+    // 只写其中一项时保持独立成卡。
+    expect(buildGeneralCards(servers, customGeneral('uploadSpeed')).map((card) => card.key))
+      .toEqual(['uploadSpeed'])
+    expect(buildGeneralCards(servers, customGeneral('downloadSpeed')).map((card) => card.key))
+      .toEqual(['downloadSpeed'])
+    // 两者不相邻时同样不合并。
+    expect(buildGeneralCards(servers, customGeneral('memory\nuploadSpeed\nmonthlyTraffic\ndownloadSpeed'))
+      .map((card) => card.key)).toEqual(['memory', 'uploadSpeed', 'monthlyTraffic', 'downloadSpeed'])
   })
 
   it('任一节点累计流量缺一向时不显示伪完整总量', () => {
@@ -212,13 +234,12 @@ describe('总览卡片对齐 Komari NodeGeneralCards', () => {
         memory: { used: 1, total: 2, percentage: 50 },
         network: { inSpeed: 1, outSpeed: 1, received: 1, transmitted: 1, monthlyReceived: null, monthlyTransmitted: null },
       })],
-      customGeneral('memory\ntotalTraffic\nuploadSpeed\ndownloadSpeed\nonlineNodes\ntrafficWarnings'),
+      customGeneral('memory\ntotalTraffic\nrealtimeSpeed\nonlineNodes\ntrafficWarnings'),
     )
     expect(cards.map((card) => card.icon)).toEqual([
       'icon-park-outline:memory',
       'tabler:download',
-      'tabler:chevrons-up',
-      'tabler:chevrons-down',
+      'tabler:arrows-transfer-up-down',
       'tabler:activity-heartbeat',
       'tabler:traffic-cone',
     ])
@@ -245,14 +266,15 @@ describe('General Card 预设顺序对齐 Komari GENERAL_CARD_PRESETS', () => {
   }
 
   it('保持上游顺序，只删掉 CFSM 无法真实计算的条目', () => {
-    expect(keysFor('官方')).toEqual(['currentTime', 'onlineNodes', 'regionDistribution', 'totalTraffic', 'uploadSpeed', 'downloadSpeed'])
+    // 上下行合并为「实时网速」后仍保持 6 张：官方预设补上本月流量。
+    expect(keysFor('官方')).toEqual(['currentTime', 'onlineNodes', 'regionDistribution', 'realtimeSpeed', 'monthlyTraffic', 'totalTraffic'])
     // 「基础」与上游一样是 6 张，第三张是剩余价值（v1.1.7 起可换算）。
-    expect(keysFor('基础')).toEqual(['memory', 'disk', 'remainingValue', 'totalTraffic', 'uploadSpeed', 'downloadSpeed'])
+    expect(keysFor('基础')).toEqual(['memory', 'disk', 'remainingValue', 'realtimeSpeed', 'monthlyTraffic', 'totalTraffic'])
     expect(keysFor('运维')).toEqual(['onlineNodes', 'offlineNodes', 'highLoadNodes', 'trafficWarnings', 'avgCpu', 'avgLoad'])
     expect(keysFor('资源')).toEqual(['avgCpu', 'avgLoad', 'memory', 'disk', 'swap', 'cpuCores'])
     // 上游「财务」的第 6 张 trafficQuota 需要站点级配额，CFSM 没有。
     expect(keysFor('财务')).toEqual(['remainingValue', 'monthlyCost', 'yearlyCost', 'expiringNodes', 'totalTraffic'])
-    expect(keysFor('流量')).toEqual(['totalTraffic', 'uploadSpeed', 'downloadSpeed', 'trafficPeak', 'trafficWarnings'])
+    expect(keysFor('流量')).toEqual(['realtimeSpeed', 'monthlyTraffic', 'totalTraffic', 'trafficPeak', 'trafficWarnings'])
     expect(keysFor('GPU')).toEqual(['gpuNodes', 'avgGpu', 'avgCpu', 'memory', 'trafficPeak'])
     expect(keysFor('资产')).toEqual(['onlineNodes', 'regionDistribution', 'systemDistribution', 'cpuCores', 'gpuNodes'])
   })
@@ -260,7 +282,7 @@ describe('General Card 预设顺序对齐 Komari GENERAL_CARD_PRESETS', () => {
   it('「完整」按上游 ALL_GENERAL_CARD_KEYS 的顺序排列', () => {
     expect(keysFor('完整')).toEqual([
       'currentTime', 'memory', 'disk', 'remainingValue', 'monthlyCost',
-      'totalTraffic', 'uploadSpeed', 'downloadSpeed',
+      'totalTraffic', 'monthlyTraffic', 'realtimeSpeed',
       'onlineNodes', 'offlineNodes', 'avgCpu', 'avgGpu', 'avgLoad', 'swap',
       'processes', 'connections', 'cpuCores', 'gpuNodes', 'trafficPeak',
       'highLoadNodes', 'expiringNodes', 'trafficWarnings',

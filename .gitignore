@@ -1,5 +1,4 @@
 node_modules/
-dist/
 coverage/
 .eslintcache
 *.zip
@@ -7,7 +6,15 @@ coverage/
 .env.*
 !.env.example
 
+# `dist/` 是发布用的编译产物，随源码一起提交：
+# CFSM 主题商店支持子目录主题地址（`/tree/<branch>/dist`），
+# 因此源码放仓库根、产物放 dist/，两边在同一个分支里同步查看。
+# 这里只排除构建中间件，index.html 与 assets/ 保持可提交。
+#
+# 注意：不能直接写 `dist/`，那会让目录整体被忽略，
+# 之后对目录内部任何文件的重新包含都会被 git 拒绝。
+dist/.vite/
+
 # Codex projectless workspace helpers and read-only upstream checkouts.
 work/
 outputs/
-

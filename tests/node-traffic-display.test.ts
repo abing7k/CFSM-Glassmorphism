@@ -109,15 +109,24 @@ async function cardTraffic(overrides: Partial<GlassServer>, density: 'comfortabl
   return { head: match?.[1]?.trim() ?? '', hint: match?.[2]?.trim() ?? '' }
 }
 
-async function listTraffic(overrides: Partial<GlassServer>): Promise<string> {
+async function listValues(overrides: Partial<GlassServer>): Promise<string[]> {
   const html = await renderToString(createSSRApp(ServerList, {
     servers: [server(overrides)], showSource: false, favoriteKeys: new Set<string>(),
     metadataEnabled: false, metadataFields: [], customTagsVisible: false, providerAliases: [], priceVisible: true,
   }))
-  const values = [...html.matchAll(/<span class="node-list__metric-value">([^<]*)<\/span>/g)].map((item) => item[1]?.trim() ?? '')
-  // CPU / 内存 / 硬盘 / 流量
-  expect(values).toHaveLength(4)
-  return values[3] ?? ''
+  // 两列流量带 title（完整值的 tooltip），因此匹配时允许 class 之后还有其它属性。
+  const values = [...html.matchAll(/<span class="node-list__metric-value"[^>]*>([^<]*)<\/span>/g)].map((item) => item[1]?.trim() ?? '')
+  // CPU / 内存 / 硬盘 / 本月流量 / 总流量
+  expect(values).toHaveLength(5)
+  return values
+}
+
+async function listMonthlyTraffic(overrides: Partial<GlassServer>): Promise<string> {
+  return (await listValues(overrides))[3] ?? ''
+}
+
+async function listTotalTraffic(overrides: Partial<GlassServer>): Promise<string> {
+  return (await listValues(overrides))[4] ?? ''
 }
 
 describe('节点卡片与节点列表的流量格', () => {
@@ -135,10 +144,22 @@ describe('节点卡片与节点列表的流量格', () => {
     expect(traffic).toEqual({ head: '-', hint: '- / -' })
   })
 
-  it('列表：与卡片同一口径', async () => {
-    expect(await listTraffic({})).toBe('∞')
-    expect(await listTraffic({ trafficLimit: '550.0' })).toBe('0.7%')
-    expect(await listTraffic({ trafficLimit: '550.0', ...withMonthly(null, null) })).toBe('-')
-    expect(await listTraffic({ showTraffic: false, trafficLimit: '550.0' })).toBe('-')
+  /*
+   * 列表改成「本月流量 / 总流量」两列后，两列都直接呈现真实字节数，
+   * 不再复用卡片的百分比口径；缺失时统一给占位符。
+   */
+  it('列表：本月流量读月度计数，总流量读网卡累计计数', async () => {
+    // 默认 fixture 只有月度计数（3 GiB 下行 + 1 GiB 上行）。
+    expect(await listMonthlyTraffic({})).toBe('4.0 GB')
+    expect(await listMonthlyTraffic({ ...withMonthly(null, null) })).toBe('-')
+    // 总流量读网卡累计计数，与月度计数、站点流量开关都无关。
+    const cumulative = {
+      network: {
+        inSpeed: null, outSpeed: null, received: 3 * GiB, transmitted: GiB,
+        monthlyReceived: null, monthlyTransmitted: null,
+      },
+    }
+    expect(await listTotalTraffic(cumulative)).toBe('4.0 GB')
+    expect(await listTotalTraffic({ ...cumulative, showTraffic: false })).toBe('4.0 GB')
   })
 })

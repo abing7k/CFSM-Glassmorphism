@@ -310,7 +310,8 @@ describe('Komari fidelity contracts', () => {
     expect(list).not.toMatch(/<tbody[\s>]/)
     expect(list).toContain('node-list__row')
     expect(list).toContain('gridTemplateColumns')
-    for (const key of ['status', 'os', 'name', 'metadata', 'uptime', 'cpu', 'mem', 'disk', 'traffic', 'rate']) {
+    // 「实时网速」列插在硬盘之后（本主题的列顺序），随后是两列流量。
+    for (const key of ['status', 'os', 'name', 'metadata', 'uptime', 'cpu', 'mem', 'disk', 'rate', 'monthly', 'total']) {
       expect(list).toContain(`key: '${key}'`)
     }
     // 「信息」列由 nodeListMetadataEnabled 控制，与上游列过滤一致。

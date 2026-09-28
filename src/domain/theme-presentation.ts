@@ -51,6 +51,7 @@ import {
 export type GeneralCardKey =
   | 'currentTime' | 'memory' | 'disk' | 'remainingValue' | 'monthlyCost'
   | 'totalTraffic' | 'uploadSpeed' | 'downloadSpeed'
+  | 'realtimeSpeed' | 'monthlyTraffic'
   | 'onlineNodes' | 'offlineNodes' | 'avgCpu' | 'avgGpu' | 'avgLoad'
   | 'swap' | 'processes' | 'connections' | 'cpuCores' | 'gpuNodes'
   | 'trafficPeak' | 'highLoadNodes' | 'expiringNodes' | 'trafficWarnings'
@@ -79,7 +80,7 @@ export type ChartFamily =
 /** Komari `ALL_GENERAL_CARD_KEYS` 的顺序，去掉 CFSM 无法真实计算的项目。 */
 const ALL_GENERAL_CARD_KEYS: readonly GeneralCardKey[] = [
   'currentTime', 'memory', 'disk', 'remainingValue', 'monthlyCost',
-  'totalTraffic', 'uploadSpeed', 'downloadSpeed',
+  'totalTraffic', 'monthlyTraffic', 'realtimeSpeed',
   'onlineNodes', 'offlineNodes', 'avgCpu', 'avgGpu', 'avgLoad', 'swap',
   'processes', 'connections', 'cpuCores', 'gpuNodes', 'trafficPeak',
   'highLoadNodes', 'expiringNodes', 'trafficWarnings',
@@ -93,12 +94,12 @@ const ALL_GENERAL_CARD_KEYS: readonly GeneralCardKey[] = [
  * 因此是 5 张；其余预设与上游张数相同。
  */
 const GENERAL_PRESETS: Record<ThemeSettings['generalCardPreset'], readonly GeneralCardKey[]> = {
-  官方: ['currentTime', 'onlineNodes', 'regionDistribution', 'totalTraffic', 'uploadSpeed', 'downloadSpeed'],
-  基础: ['memory', 'disk', 'remainingValue', 'totalTraffic', 'uploadSpeed', 'downloadSpeed'],
+  官方: ['currentTime', 'onlineNodes', 'regionDistribution', 'realtimeSpeed', 'monthlyTraffic', 'totalTraffic'],
+  基础: ['memory', 'disk', 'remainingValue', 'realtimeSpeed', 'monthlyTraffic', 'totalTraffic'],
   运维: ['onlineNodes', 'offlineNodes', 'highLoadNodes', 'trafficWarnings', 'avgCpu', 'avgLoad'],
   资源: ['avgCpu', 'avgLoad', 'memory', 'disk', 'swap', 'cpuCores'],
   财务: ['remainingValue', 'monthlyCost', 'yearlyCost', 'expiringNodes', 'totalTraffic'],
-  流量: ['totalTraffic', 'uploadSpeed', 'downloadSpeed', 'trafficPeak', 'trafficWarnings'],
+  流量: ['realtimeSpeed', 'monthlyTraffic', 'totalTraffic', 'trafficPeak', 'trafficWarnings'],
   GPU: ['gpuNodes', 'avgGpu', 'avgCpu', 'memory', 'trafficPeak'],
   资产: ['onlineNodes', 'regionDistribution', 'systemDistribution', 'cpuCores', 'gpuNodes'],
   完整: ALL_GENERAL_CARD_KEYS,
@@ -193,13 +194,60 @@ function selectedKeys<T extends string>(preset: readonly T[], custom: string, al
   return requested.filter((key): key is T => allowed.has(key))
 }
 
-const GENERAL_KEYS = new Set<string>(ALL_GENERAL_CARD_KEYS)
+/*
+ * 允许写入自定义列表的全部 key。「完整」预设不再列出分开的上下行（已合并成实时网速），
+ * 但这两个 key 仍然合法：老配置会继续被合并，只想单看一个方向的配置也照样能用。
+ */
+const GENERAL_KEYS = new Set<string>([...ALL_GENERAL_CARD_KEYS, 'uploadSpeed', 'downloadSpeed'])
 const QUICK_KEYS = new Set<string>(ALL_QUICK_CONTROL_KEYS)
 const DETAIL_KEYS = new Set<string>(ALL_DETAIL_CARD_KEYS)
 const CHART_KEYS = new Set<string>(CHART_PRESETS.完整)
 
 export function resolveGeneralCardKeys(settings: ThemeSettings): GeneralCardKey[] {
-  return selectedKeys(GENERAL_PRESETS[settings.generalCardPreset], settings.generalCardKeys, GENERAL_KEYS)
+  return mergeRealtimeSpeedKeys(
+    selectedKeys(GENERAL_PRESETS[settings.generalCardPreset], settings.generalCardKeys, GENERAL_KEYS),
+  )
+}
+
+/*
+ * 兼容既有配置：总览的「实时上行」与「实时下行」已合并为一张「实时网速」卡。
+ * 旧配置（或旧预设）里相邻出现的这一对 key 会在读取时收敛成 `realtimeSpeed`，
+ * 位置取两者中靠前的一个，后面的其余 key 顺序不变。
+ *
+ * 只在这一对**同时相邻出现**时合并：单独写 `uploadSpeed` 或 `downloadSpeed`
+ * 仍然各自成卡，需要分开显示的配置不会被强行改写。
+ *
+ * 「完整」预设同时列出了新卡与旧的上下行两项，合并后会出现重复的 `realtimeSpeed`；
+ * 这里只保留第一次出现的位置，避免同一张卡渲染两遍。
+ */
+function mergeRealtimeSpeedKeys(keys: readonly GeneralCardKey[]): GeneralCardKey[] {
+  const merged: GeneralCardKey[] = []
+  let realtimeAdded = false
+  for (let index = 0; index < keys.length; index += 1) {
+    const key = keys[index]
+    if (key === 'uploadSpeed' && keys[index + 1] === 'downloadSpeed') {
+      if (!realtimeAdded) {
+        merged.push('realtimeSpeed')
+        realtimeAdded = true
+      }
+      index += 1
+      continue
+    }
+    if (key === 'downloadSpeed' && keys[index + 1] === 'uploadSpeed') {
+      if (!realtimeAdded) {
+        merged.push('realtimeSpeed')
+        realtimeAdded = true
+      }
+      index += 1
+      continue
+    }
+    if (key === 'realtimeSpeed') {
+      if (realtimeAdded) continue
+      realtimeAdded = true
+    }
+    if (key !== undefined) merged.push(key)
+  }
+  return merged
 }
 
 export function resolveQuickControlKeys(settings: ThemeSettings): QuickControlKey[] {
@@ -626,6 +674,27 @@ export function buildGeneralCards(
   const trafficUp = sum(trafficReady.map((server) => server.network.transmitted))
   const trafficDown = sum(trafficReady.map((server) => server.network.received))
   const totalTraffic = trafficUp !== null && trafficDown !== null ? trafficUp + trafficDown : null
+  /*
+   * 「本月流量」与「累计流量」是两个独立口径，与节点列表里的两列保持一致：
+   * 累计流量读网卡累计计数（`network.received + transmitted`），本月流量读计费周期内的
+   * 月度计数（`monthlyNetworkReceived / monthlyNetworkTransmitted`，按 `traffic_calc_type` 合计）。
+   * 缺失的节点不能被当成 0 计入，所以同样先过滤再求和。
+   */
+  const monthlyReady = servers.filter((server) => (
+    trafficUsageBytes(
+      server.network.monthlyReceived,
+      server.network.monthlyTransmitted,
+      server.trafficCalculationType,
+    ) !== null
+  ))
+  const missingMonthlyCount = servers.length - monthlyReady.length
+  const monthlyReceived = sum(monthlyReady.map((server) => server.network.monthlyReceived))
+  const monthlyTransmitted = sum(monthlyReady.map((server) => server.network.monthlyTransmitted))
+  const monthlyTrafficTotal = sum(monthlyReady.map((server) => trafficUsageBytes(
+    server.network.monthlyReceived,
+    server.network.monthlyTransmitted,
+    server.trafficCalculationType,
+  )))
   const upload = sum(online.map((server) => server.network.outSpeed))
   const download = sum(online.map((server) => server.network.inSpeed))
   const peak = peakSpeedNode(online)
@@ -648,6 +717,7 @@ export function buildGeneralCards(
   const expiringCount = servers.filter((server) => isExpiring(server, settings.homeExpiringDays, now)).length
   const trafficWarningCount = servers.filter((server) => isTrafficWarning(server, settings.homeTrafficWarningThreshold)).length
   const totalTrafficSplit = formatDisplayBytesSplit(totalTraffic)
+  const monthlyTrafficSplit = formatDisplayBytesSplit(monthlyTrafficTotal)
   const uploadSplit = formatDisplaySpeedSplit(upload)
   const downloadSplit = formatDisplaySpeedSplit(download)
   const peakSplit = formatDisplaySpeedSplit(peak?.value ?? null)
@@ -658,6 +728,13 @@ export function buildGeneralCards(
     memory: usageCard('memory', 'icon-park-outline:memory', '内存用量', memory),
     disk: usageCard('disk', 'tabler:server-2', '硬盘用量', disk),
     totalTraffic: totalTraffic === null ? null : { key: 'totalTraffic', icon: 'tabler:download', label: '累计流量', value: totalTrafficSplit.value, unit: totalTrafficSplit.unit, hint: `↑ ${formatDisplayBytes(trafficUp)}\n↓ ${formatDisplayBytes(trafficDown)}${missingTrafficCount > 0 ? `\n部分 · ${missingTrafficCount} 台缺少流量数据，未计入` : ''}` },
+    monthlyTraffic: monthlyTrafficTotal === null ? null : { key: 'monthlyTraffic', icon: 'tabler:calendar-stats', label: '本月流量', value: monthlyTrafficSplit.value, unit: monthlyTrafficSplit.unit, hint: `↑ ${formatDisplayBytes(monthlyTransmitted)}\n↓ ${formatDisplayBytes(monthlyReceived)}${missingMonthlyCount > 0 ? `\n部分 · ${missingMonthlyCount} 台缺少数据，未计入` : ''}` },
+    /*
+     * 「实时网速」把原先分开的上下行合成一张卡：主数值仍是上行，单位行补上行的下行，
+     * 这样三张卡（实时网速 / 本月流量 / 累计流量）在总览栅格里高度一致，也不会丢掉任何一项。
+     * 上下行都没有采样（无在线节点上报）时不造卡，与原来两张卡的隐藏条件保持一致。
+     */
+    realtimeSpeed: upload === null && download === null ? null : { key: 'realtimeSpeed', icon: 'tabler:arrows-transfer-up-down', label: '实时网速', value: `↑ ${formatDisplaySpeed(upload)}`, unit: `↓ ${formatDisplaySpeed(download)}`, hint: '在线节点合计' },
     uploadSpeed: upload === null ? null : { key: 'uploadSpeed', icon: 'tabler:chevrons-up', label: '实时上行', value: uploadSplit.value, unit: uploadSplit.unit, hint: '在线节点合计' },
     downloadSpeed: download === null ? null : { key: 'downloadSpeed', icon: 'tabler:chevrons-down', label: '实时下行', value: downloadSplit.value, unit: downloadSplit.unit, hint: '在线节点合计' },
     onlineNodes: { key: 'onlineNodes', icon: 'tabler:activity-heartbeat', label: '在线节点', value: formatCount(online.length), unit: `/ ${formatCount(servers.length)}`, hint: `${offlineCount} 台离线` },

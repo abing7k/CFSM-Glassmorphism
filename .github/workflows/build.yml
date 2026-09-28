@@ -4,8 +4,6 @@ on:
   push:
     branches:
       - main
-    tags:
-      - 'v*'
   pull_request:
   workflow_dispatch:
 
@@ -16,8 +14,6 @@ jobs:
   verify:
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    outputs:
-      artifact-name: ${{ steps.artifact.outputs.file }}
 
     steps:
       - name: Check out repository
@@ -46,237 +42,17 @@ jobs:
       - name: Validate dist
         run: bun run validate:dist
 
-      - name: Resolve artifact name
-        id: artifact
-        shell: bash
-        run: echo "file=CFSM-Glassmorphism-build-${GITHUB_SHA::7}.zip" >> "$GITHUB_OUTPUT"
-
-      - name: Package theme
-        working-directory: dist
-        run: zip -r "../${{ steps.artifact.outputs.file }}" index.html assets
-
-      - name: Upload theme archive
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ steps.artifact.outputs.file }}
-          path: ${{ steps.artifact.outputs.file }}
-          if-no-files-found: error
-          retention-days: 14
-
-  # main 保留源码；只有通过质量门的构建才进入可安装的滚动预览分支。
-  # 不打标签、不创建 Release，也不改稳定版 theme-dist。
-  preview-main:
-    if: github.ref == 'refs/heads/main'
-    needs: verify
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    concurrency:
-      group: publish-preview-main
-      cancel-in-progress: false
-    permissions:
-      contents: write
-
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-
-      - name: Download verified theme archive
-        uses: actions/download-artifact@v4
-        with:
-          name: ${{ needs.verify.outputs.artifact-name }}
-          path: archive
-
-      - name: Publish installable main preview
-        run: node scripts/publish-preview.mjs "archive/${{ needs.verify.outputs.artifact-name }}" "$GITHUB_SHA"
-
-  # CFSM 主题商店支持「自定义主题 URL」，它把
-  # https://github.com/<owner>/<repo>/tree/<ref> 解析为
-  # https://raw.githubusercontent.com/<owner>/<repo>/<ref>/ 并直接拉取
-  # index.html 与 assets/。因此构建产物必须存在于某个 git ref 中。
-  # 这里只把已通过全部质量门的产物发布到专用的 theme-dist 分支，
-  # 并打一个不可变的 theme-v<version> 标签供用户固定版本；
-  # main 的源码历史依旧不包含 dist。
-  theme-branch:
-    if: startsWith(github.ref, 'refs/tags/v')
-    needs: verify
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      contents: write
-
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Download verified theme archive
-        uses: actions/download-artifact@v4
-        with:
-          name: ${{ needs.verify.outputs.artifact-name }}
-          path: archive
-
-      - name: Publish theme-store branch and immutable tag
+      # dist/ 已提交进仓库，所以这里只校验「构建结果与已提交的产物一致」，
+      # 避免源码改了却忘记重新编译、把过期产物推上去。
+      # 本 fork 使用单分支 + dist/ 子目录结构，CI 不再创建 theme-dist / preview-main。
+      - name: Check committed dist is up to date
         shell: bash
         run: |
           set -euo pipefail
-          theme_tag="theme-${GITHUB_REF_NAME}"
-          if git ls-remote --exit-code --tags origin "$theme_tag" >/dev/null 2>&1; then
-            echo "Theme tag $theme_tag already exists; refusing to overwrite." >&2
-            exit 1
+          if [ -z "$(git status --porcelain -- dist)" ]; then
+            echo "dist/ 与源码构建结果一致"
+            exit 0
           fi
-
-          workdir="$(mktemp -d)"
-          unzip -q "archive/${{ needs.verify.outputs.artifact-name }}" -d "$workdir"
-          # 主题包根必须直接是 index.html + assets/，否则主题商店取不到文件。
-          test -f "$workdir/index.html"
-          test -d "$workdir/assets"
-
-          # 主题商店把 theme-dist 的提交标题当作版本名显示在安装下拉里，
-          # 所以这里不用 `chore: …` 这类对使用者没有意义的前缀。
-          # 发布说明可选地写一行 `<!-- store-label: 简述 -->`（HTML 注释，渲染后不可见），
-          # 写了就显示 `v1.2.3 · 简述`，没写就只显示 `v1.2.3`。
-          # 必须在切到 theme-dist 之前读，那一步会清空源码树。
-          notes_file="docs/releases/${GITHUB_REF_NAME}.md"
-          store_label=""
-          if [[ -f "$notes_file" ]]; then
-            store_label="$(grep -m1 -oP '(?<=<!-- store-label:).*?(?=-->)' "$notes_file" 2>/dev/null || true)"
-            store_label="$(printf '%s' "$store_label" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
-          fi
-          if [[ -n "$store_label" ]]; then
-            commit_subject="${GITHUB_REF_NAME} · ${store_label}"
-          else
-            commit_subject="${GITHUB_REF_NAME}"
-          fi
-          echo "theme-dist commit subject: $commit_subject"
-
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-
-          if git ls-remote --exit-code --heads origin theme-dist >/dev/null 2>&1; then
-            git fetch --depth=1 origin theme-dist
-            git checkout -B theme-dist FETCH_HEAD
-          else
-            git checkout --orphan theme-dist
-          fi
-
-          find . -mindepth 1 -maxdepth 1 -not -name .git -exec rm -rf {} +
-          cp -r "$workdir"/. .
-          git add -A
-          git commit -m "$commit_subject"
-          git tag "$theme_tag"
-          git push origin "$theme_tag"
-
-          # 预发布版本只发布不可变的 theme-<tag>，不推进 theme-dist——
-          # 那条滚动分支代表「最新稳定版」，测试版不应改变它指向的内容。
-          if [[ "$GITHUB_REF_NAME" == *-* ]]; then
-            echo "Pre-release $GITHUB_REF_NAME: leaving theme-dist untouched."
-          else
-            git push origin theme-dist
-          fi
-
-  release:
-    if: startsWith(github.ref, 'refs/tags/v')
-    needs: [verify, theme-branch]
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      contents: write
-
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-
-      - name: Set up Bun
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: 1.3.14
-
-      - name: Download verified theme archive
-        uses: actions/download-artifact@v4
-        with:
-          name: ${{ needs.verify.outputs.artifact-name }}
-          path: .
-
-      - name: Prepare stable release archive
-        id: release
-        shell: bash
-        run: |
-          set -euo pipefail
-          package_version="$(bun -e "console.log(require('./package.json').version)")"
-          tag_version="${GITHUB_REF_NAME#v}"
-          if [[ "$package_version" != "$tag_version" ]]; then
-            echo "Tag $GITHUB_REF_NAME does not match package version $package_version" >&2
-            exit 1
-          fi
-          release_file="CFSM-Glassmorphism-${GITHUB_REF_NAME}.zip"
-          mv "${{ needs.verify.outputs.artifact-name }}" "$release_file"
-          echo "file=$release_file" >> "$GITHUB_OUTPUT"
-
-          # 带连字符的语义化版本（例如 1.1.0-test.1）按预发布处理：
-          # 标记为 pre-release，且不抢占 Latest。
-          notes_file="docs/releases/${GITHUB_REF_NAME}.md"
-          if [[ ! -f "$notes_file" ]]; then
-            echo "Missing release notes: $notes_file" >&2
-            exit 1
-          fi
-          echo "notes=$notes_file" >> "$GITHUB_OUTPUT"
-          if [[ "$package_version" == *-* ]]; then
-            echo "flags=--prerelease" >> "$GITHUB_OUTPUT"
-          else
-            echo "flags=--latest" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Publish GitHub Release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: >-
-          gh release create "$GITHUB_REF_NAME"
-          "${{ steps.release.outputs.file }}#CFSM Glassmorphism theme archive"
-          --verify-tag
-          ${{ steps.release.outputs.flags }}
-          --title "CFSM Glassmorphism $GITHUB_REF_NAME"
-          --notes-file "${{ steps.release.outputs.notes }}"
-
-  # Release body 只在 `gh release create` 那一刻写入，之后改 docs/releases/*.md
-  # 不会回写到已发布的 Release 页面。这个 job 让仓库文件成为唯一事实来源：
-  # 每次 main 有推送就把已发布 Release 的正文与对应文件对齐，
-  # 用的是 Actions 自带的 GITHUB_TOKEN，不需要任何人另外提供 PAT。
-  # 只改正文，不碰 tag、附件、prerelease/latest 标记与 theme-dist。
-  release-notes:
-    if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      contents: write
-
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-
-      - name: Sync published release bodies with docs/releases
-        env:
-          GH_TOKEN: ${{ github.token }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          updated=0
-          for notes in docs/releases/*.md; do
-            tag="$(basename "$notes" .md)"
-            if ! gh release view "$tag" --json tagName >/dev/null 2>&1; then
-              echo "skip    $tag (not published yet)"
-              continue
-            fi
-            # GitHub 存的正文是 CRLF，文件是 LF，比较前统一去掉 CR，
-            # 否则每次都会判定为「有变化」而白改一遍。
-            current="$(gh release view "$tag" --json body --jq .body | tr -d '\r')"
-            desired="$(cat "$notes")"
-            if [[ "$current" == "$desired" ]]; then
-              echo "current $tag"
-              continue
-            fi
-            gh release edit "$tag" --notes-file "$notes"
-            echo "updated $tag"
-            updated=$((updated + 1))
-          done
-          echo "release notes synced; $updated release(s) updated"
+          echo "::error::dist/ 与当前源码的构建结果不一致，请先在本地运行 bun run publish 并提交 dist/。"
+          git status --short -- dist
+          exit 1

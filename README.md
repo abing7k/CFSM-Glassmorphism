@@ -62,6 +62,29 @@
 
 ### 一、安装主题
 
+本 fork 把**源码与编译产物放在同一个分支**里：
+
+```text
+main（唯一分支）
+├── index.html、src/、tests/、scripts/ …   ← 编译前源码
+└── dist/                                  ← 编译后产物（index.html + assets/）
+    ├── index.html
+    └── assets/
+```
+
+CFSM 的主题地址支持子目录，所以装这个 fork 时指向 `dist` 即可：
+
+```text
+https://github.com/abing7k/CFSM-Glassmorphism/tree/main/dist
+```
+
+这样改完源码重新编译、把 `dist/` 一起推上去，站点就会用上新版；想对照改动时，
+源码和产物都在同一个提交里，不用在分支之间来回切。
+
+> 上游原仓库用的是 `main`（源码）+ `theme-dist`（产物）双分支结构。本 fork 改成
+> 单分支 + `dist/` 子目录，是为了让每次改动只提交一次、来源与产物永远对应。
+> 旧的 `theme-dist` 分支与 `theme-live-2026-09-24` 标签仍保留，供已安装的地址继续使用。
+
 在 CFSM 管理端打开 **主题商店 → 自定义主题 URL**，推荐填入稳定版的不可变标签地址，再点「应用自定义」：
 
 ```text
@@ -155,7 +178,15 @@ bun run typecheck
 bun run test
 bun run build        # 产物输出到 dist/
 bun run validate:dist
+
+# 一条命令走完全部质量门并产出可提交的 dist/
+bun run publish
 ```
+
+改完源码后跑 `bun run publish`：它依次执行 lint → 类型检查 → 测试 → 构建 → 产物校验，
+然后 `git add -A && git commit`。之后 `git push` 即可，站点最长约 1 小时后取到新版本
+（分支引用的缓存 TTL；用 40 位提交 SHA 安装则是 1 天，且需要手动换地址）。
+`dist/` 已纳入版本管理，源码与产物在同一个提交里。
 
 构建产物根目录只包含 `index.html` 与 `assets/`，符合 CFSM 对第三方主题的目录约定。CI 在推送 main、版本标签、Pull Request 时执行同一组质量门；推送 `v<版本>` 标签会发布 ZIP、更新 `theme-dist` 分支并创建不可变的 `theme-v<版本>` 标签。
 

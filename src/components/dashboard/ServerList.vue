@@ -4,21 +4,18 @@ import type { GlassServer } from '@/types/glassmorphism'
 import AppIcon from '@/components/ui/AppIcon.vue'
 import AppProgressThin from '@/components/ui/AppProgressThin.vue'
 import { resolveRegionCoordinates } from '@/domain/advanced-tools'
-import { windowAverage } from '@/domain/probe-window'
 import {
   matchProvider,
-  trafficDisplay,
-  trafficDisplayPercent,
-  trafficHeadText,
+  trafficUsageBytes,
   type ProviderAlias,
 } from '@/domain/theme-presentation'
 import { flagUrl, hideMissingFlag } from '@/utils/flags'
 import { osDisplayName, osIconUrl } from '@/utils/os-icon'
-import { trafficStatus, usageStatus } from '@/utils/progress-status'
+import { usageStatus } from '@/utils/progress-status'
 import {
+  formatDisplayBytes,
   formatDisplayPrice,
   formatDisplaySpeed,
-  formatLatency,
   formatPercent,
   formatUptime,
   MISSING_TEXT,
@@ -52,20 +49,21 @@ interface ListColumn {
   key: string
   label: string
   width: string
-  center?: boolean
+  align?: 'left' | 'center' | 'right'
 }
 
 const BASE_COLUMNS: readonly ListColumn[] = [
-  { key: 'status', label: '状态', width: '40px', center: true },
-  { key: 'os', label: '系统', width: '44px', center: true },
-  { key: 'name', label: '节点', width: 'minmax(180px, 0.85fr)' },
-  { key: 'metadata', label: '信息', width: 'minmax(240px, 1.1fr)' },
-  { key: 'uptime', label: '运行时间', width: '116px' },
-  { key: 'cpu', label: 'CPU', width: '100px' },
-  { key: 'mem', label: '内存', width: '100px' },
-  { key: 'disk', label: '硬盘', width: '100px' },
-  { key: 'traffic', label: '流量', width: '104px' },
-  { key: 'rate', label: '速率', width: '88px' },
+  { key: 'status', label: '状态', width: '40px', align: 'center' },
+  { key: 'os', label: '系统', width: '44px', align: 'center' },
+  { key: 'name', label: '节点', width: 'minmax(150px, 0.9fr)', align: 'left' },
+  { key: 'metadata', label: '国家', width: 'minmax(96px, 0.6fr)', align: 'center' },
+  { key: 'uptime', label: '运行时间', width: '104px', align: 'center' },
+  { key: 'cpu', label: 'CPU', width: '92px', align: 'center' },
+  { key: 'mem', label: '内存', width: '92px', align: 'center' },
+  { key: 'disk', label: '硬盘', width: '92px', align: 'center' },
+  { key: 'rate', label: '实时网速', width: '96px', align: 'center' },
+  { key: 'monthly', label: '本月流量', width: '92px', align: 'center' },
+  { key: 'total', label: '总流量', width: '92px', align: 'center' },
 ]
 
 const columns = computed(() => BASE_COLUMNS.filter(
@@ -74,6 +72,11 @@ const columns = computed(() => BASE_COLUMNS.filter(
 const gridStyle = computed(() => ({
   gridTemplateColumns: columns.value.map((column) => column.width).join(' '),
 }))
+
+function columnAlign(key: string): string {
+  const column = BASE_COLUMNS.find((item) => item.key === key)
+  return `node-list__col--${column?.align ?? 'left'}`
+}
 
 function ratio(used: number | null, total: number | null): number | null {
   if (used === null || total === null || total <= 0) return null
@@ -123,24 +126,38 @@ function metadataBadges(server: GlassServer): MetadataBadge[] {
 }
 
 /*
- * 与节点卡、上游一致：显示 `/api/servers` 已返回的窗口平均延迟，而不是最近一次采样
- * （上游 `useNodePingDisplay` 的 `latencyDisplay` 取的是 `pingStats.avgLatency`）。
- * 站点关闭三网详情时窗口为空，回落到本次上报的最新值。
+ * 两列流量与总览卡片保持同一口径：
+ * - 「本月流量」读计费周期内的月度计数，按 CFSM 的 `traffic_calc_type` 合计；
+ * - 「总流量」读网卡累计计数（`network.received + transmitted`），与站点开关无关，
+ *   因为它是探针自启动以来的真实累计值，不是配额用量。
+ * 两列都只呈现真实数字，缺失时给占位符。
  */
-function probeText(server: GlassServer): string {
-  const probe = server.latency[0]
-  if (!probe) return MISSING_TEXT
-  const average = windowAverage(server.history.latencySeries, probe.target)
-  return `${probe.label} ${formatLatency(average.value ?? probe.latency)}`
+function monthlyTrafficText(server: GlassServer): string {
+  const used = trafficUsageBytes(
+    server.network.monthlyReceived,
+    server.network.monthlyTransmitted,
+    server.trafficCalculationType,
+  )
+  return formatDisplayBytes(used)
 }
 
-/** 与节点卡同一口径（`trafficDisplay`）：关闭流量展示或已用量缺失时不写成「∞」。 */
-function trafficPercent(server: GlassServer): number | null {
-  return trafficDisplayPercent(trafficDisplay(server))
+function totalTrafficText(server: GlassServer): string {
+  const used = trafficUsageBytes(
+    server.network.received,
+    server.network.transmitted,
+    server.trafficCalculationType,
+  )
+  return formatDisplayBytes(used)
 }
 
-function trafficHead(server: GlassServer): string {
-  return trafficHeadText(trafficDisplay(server))
+/** 列头 tooltip 用的完整说明：流量列受站点 `show_tf` 开关影响，需要交代清楚。 */
+function monthlyTrafficHint(server: GlassServer): string {
+  if (!server.showTraffic) return '站点已关闭流量展示'
+  return `本月 ↑ ${formatDisplayBytes(server.network.monthlyTransmitted)}\n↓ ${formatDisplayBytes(server.network.monthlyReceived)}`
+}
+
+function totalTrafficHint(server: GlassServer): string {
+  return `累计 ↑ ${formatDisplayBytes(server.network.transmitted)}\n↓ ${formatDisplayBytes(server.network.received)}`
 }
 
 function handleRowKeydown(event: KeyboardEvent, server: GlassServer): void {
@@ -163,7 +180,7 @@ function hideMissingImage(event: Event): void {
           v-for="column in columns"
           :key="column.key"
           class="node-list__heading"
-          :class="{ 'node-list__heading--center': column.center }"
+          :class="columnAlign(column.key)"
           role="columnheader"
         >
           {{ column.label }}
@@ -192,7 +209,7 @@ function hideMissingImage(event: Event): void {
         @keydown="handleRowKeydown($event, server)"
       >
         <div class="node-list__cells" :style="gridStyle">
-          <div class="node-list__cell node-list__cell--center">
+          <div class="node-list__cell" :class="columnAlign('status')">
             <span class="node-status-wrap" aria-hidden="true">
               <span
                 class="node-status"
@@ -205,7 +222,7 @@ function hideMissingImage(event: Event): void {
             </span>
           </div>
 
-          <div class="node-list__cell node-list__cell--center">
+          <div class="node-list__cell" :class="columnAlign('os')">
             <img
               class="node-list__os"
               :src="osIconUrl(server.operatingSystem)"
@@ -215,7 +232,7 @@ function hideMissingImage(event: Event): void {
             >
           </div>
 
-          <div class="node-list__cell node-list__cell--name">
+          <div class="node-list__cell node-list__cell--name" :class="columnAlign('name')">
             <div class="node-list__identity">
               <img
                 v-if="regionCode(server)"
@@ -240,7 +257,11 @@ function hideMissingImage(event: Event): void {
             <span v-if="priceText(server)" class="node-list__sub">{{ priceText(server) }}</span>
           </div>
 
-          <div v-if="metadataEnabled" class="node-list__cell node-list__cell--metadata">
+          <div
+            v-if="metadataEnabled"
+            class="node-list__cell node-list__cell--metadata"
+            :class="columnAlign('metadata')"
+          >
             <span
               v-for="badge in metadataBadges(server)"
               :key="badge.key"
@@ -252,18 +273,17 @@ function hideMissingImage(event: Event): void {
             </span>
           </div>
 
-          <div class="node-list__cell">
+          <div class="node-list__cell" :class="columnAlign('uptime')">
             <span class="node-list__sub">{{ formatUptime(server.bootTime) }}</span>
-            <span class="node-list__sub">{{ probeText(server) }}</span>
           </div>
 
-          <div class="node-list__cell node-list__cell--metric">
+          <div class="node-list__cell node-list__cell--metric" :class="columnAlign('cpu')">
             <span class="node-list__metric-value">{{ formatPercent(server.cpu) }}</span>
             <!-- 上游 NodeList 的进度条同样按 `getStatus` 着色。 -->
             <AppProgressThin :percentage="server.cpu" :status="usageStatus(server.cpu)" />
           </div>
 
-          <div class="node-list__cell node-list__cell--metric">
+          <div class="node-list__cell node-list__cell--metric" :class="columnAlign('mem')">
             <span class="node-list__metric-value">
               {{ formatPercent(ratio(server.memory.used, server.memory.total)) }}
             </span>
@@ -273,7 +293,7 @@ function hideMissingImage(event: Event): void {
             />
           </div>
 
-          <div class="node-list__cell node-list__cell--metric">
+          <div class="node-list__cell node-list__cell--metric" :class="columnAlign('disk')">
             <span class="node-list__metric-value">
               {{ formatPercent(ratio(server.disk.used, server.disk.total)) }}
             </span>
@@ -283,16 +303,29 @@ function hideMissingImage(event: Event): void {
             />
           </div>
 
-          <div class="node-list__cell node-list__cell--metric">
-            <span class="node-list__metric-value">
-              {{ trafficHead(server) }}
+          <!--
+            实时网速：紧跟硬盘之后，与右侧两列流量共同组成「资源 → 网络」的阅读顺序。
+            上行 / 下行同时给出，用颜色区分方向，缺失的一向单独显示占位符而不写成 0。
+          -->
+          <div class="node-list__cell node-list__cell--speed" :class="columnAlign('rate')">
+            <span class="node-list__sub node-list__sub--up" :title="`↑ 上传 ${formatDisplaySpeed(server.network.outSpeed)}`">
+              ↑ {{ formatDisplaySpeed(server.network.outSpeed) }}
             </span>
-            <AppProgressThin :percentage="trafficPercent(server)" :status="trafficStatus(trafficPercent(server))" />
+            <span class="node-list__sub node-list__sub--down" :title="`↓ 下载 ${formatDisplaySpeed(server.network.inSpeed)}`">
+              ↓ {{ formatDisplaySpeed(server.network.inSpeed) }}
+            </span>
           </div>
 
-          <div class="node-list__cell">
-            <span class="node-list__sub node-list__sub--up">↑ {{ formatDisplaySpeed(server.network.outSpeed) }}</span>
-            <span class="node-list__sub node-list__sub--down">↓ {{ formatDisplaySpeed(server.network.inSpeed) }}</span>
+          <div class="node-list__cell node-list__cell--bytes" :class="columnAlign('monthly')">
+            <span class="node-list__metric-value" :title="monthlyTrafficHint(server)">
+              {{ monthlyTrafficText(server) }}
+            </span>
+          </div>
+
+          <div class="node-list__cell node-list__cell--bytes" :class="columnAlign('total')">
+            <span class="node-list__metric-value" :title="totalTrafficHint(server)">
+              {{ totalTrafficText(server) }}
+            </span>
           </div>
         </div>
       </div>

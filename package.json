@@ -15,7 +15,9 @@
     "test": "vitest run --configLoader runner",
     "build": "vue-tsc --noEmit -p tsconfig.json && vite build --configLoader runner",
     "validate:dist": "bun scripts/validate-dist.mjs",
-    "preview": "vite preview --configLoader runner"
+    "preview": "vite preview --configLoader runner",
+    "verify": "bun run lint && bun run typecheck && bun run test && bun run build && bun run validate:dist",
+    "publish": "bun run verify && git add -A && git commit -m \"build: 更新 dist 产物\""
   },
   "dependencies": {
     "@vueuse/core": "^14.2.1",

@@ -682,13 +682,23 @@ export function buildGeneralCards(
   const memory = resources((server) => server.memory)
   const disk = resources((server) => server.disk)
   const swap = resources((server) => server.swap)
-  // 单节点仍须双向完整；缺失的一向绝不能被当作 0 加进全站总量。
+  /*
+   * 累计口径优先用服务端跨重启累加值（net_rx_total / net_tx_total）；
+   * 旧版本 Worker 不返回时按方向回退到网卡计数。
+   * 单节点仍须双向完整；缺失的一向绝不能被当作 0 加进全站总量。
+   */
+  const lifetimeReceived = (server: GlassServer): number | null => (
+    server.network.receivedTotal ?? server.network.received
+  )
+  const lifetimeTransmitted = (server: GlassServer): number | null => (
+    server.network.transmittedTotal ?? server.network.transmitted
+  )
   const trafficReady = servers.filter((server) => (
-    server.network.transmitted !== null && server.network.received !== null
+    lifetimeTransmitted(server) !== null && lifetimeReceived(server) !== null
   ))
   const missingTrafficCount = servers.length - trafficReady.length
-  const trafficUp = sum(trafficReady.map((server) => server.network.transmitted))
-  const trafficDown = sum(trafficReady.map((server) => server.network.received))
+  const trafficUp = sum(trafficReady.map((server) => lifetimeTransmitted(server)))
+  const trafficDown = sum(trafficReady.map((server) => lifetimeReceived(server)))
   const totalTraffic = trafficUp !== null && trafficDown !== null ? trafficUp + trafficDown : null
   /*
    * 「本月流量」与「累计流量」是两个独立口径，与节点列表里的两列保持一致：

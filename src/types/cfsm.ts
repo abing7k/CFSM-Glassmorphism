@@ -101,6 +101,9 @@ export interface CfsmServer {
   networkOutSpeed: NullableNumber
   networkReceived: NullableNumber
   networkTransmitted: NullableNumber
+  /** 服务端累加的跨重启累计值；旧版本 Worker 不返回时为 null。 */
+  networkReceivedTotal: NullableNumber
+  networkTransmittedTotal: NullableNumber
   monthlyNetworkReceived: NullableNumber
   monthlyNetworkTransmitted: NullableNumber
   processes: NullableNumber

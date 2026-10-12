@@ -101,6 +101,8 @@ export function toGlassServer(server: CfsmServer, config: SiteConfig | null): Gl
       outSpeed: finiteNonNegative(server.networkOutSpeed),
       received: finiteNonNegative(server.networkReceived),
       transmitted: finiteNonNegative(server.networkTransmitted),
+      receivedTotal: finiteNonNegative(server.networkReceivedTotal),
+      transmittedTotal: finiteNonNegative(server.networkTransmittedTotal),
       monthlyReceived: finiteNonNegative(server.monthlyNetworkReceived),
       monthlyTransmitted: finiteNonNegative(server.monthlyNetworkTransmitted),
     },

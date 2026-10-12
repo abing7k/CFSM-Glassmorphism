@@ -298,6 +298,8 @@ export function normalizeServer(
     networkOutSpeed: numberValue(input.net_out_speed),
     networkReceived: numberValue(input.net_rx),
     networkTransmitted: numberValue(input.net_tx),
+    networkReceivedTotal: numberValue(input.net_rx_total),
+    networkTransmittedTotal: numberValue(input.net_tx_total),
     monthlyNetworkReceived: numberValue(input.net_rx_monthly),
     monthlyNetworkTransmitted: numberValue(input.net_tx_monthly),
     processes: numberValue(input.processes),
@@ -457,6 +459,8 @@ export function mergeRealtimeSample(
   if ('net_out_speed' in input) next.networkOutSpeed = normalized.networkOutSpeed
   if ('net_rx' in input) next.networkReceived = normalized.networkReceived
   if ('net_tx' in input) next.networkTransmitted = normalized.networkTransmitted
+  if ('net_rx_total' in input) next.networkReceivedTotal = normalized.networkReceivedTotal
+  if ('net_tx_total' in input) next.networkTransmittedTotal = normalized.networkTransmittedTotal
   if ('net_rx_monthly' in input) next.monthlyNetworkReceived = normalized.monthlyNetworkReceived
   if ('net_tx_monthly' in input) next.monthlyNetworkTransmitted = normalized.monthlyNetworkTransmitted
   if ('processes' in input) next.processes = normalized.processes

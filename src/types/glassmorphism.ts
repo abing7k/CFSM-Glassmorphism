@@ -71,6 +71,12 @@ export interface GlassServer {
     outSpeed: number | null
     received: number | null
     transmitted: number | null
+    /**
+     * 跨重启累计值。字段可选：旧版本 Worker 的响应里没有这两项，
+     * 读取方需要用 `receivedTotal ?? received` 回退到网卡计数。
+     */
+    receivedTotal?: number | null
+    transmittedTotal?: number | null
     monthlyReceived: number | null
     monthlyTransmitted: number | null
   }

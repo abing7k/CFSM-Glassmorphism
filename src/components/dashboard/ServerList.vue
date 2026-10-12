@@ -148,11 +148,23 @@ function monthlyTrafficText(server: GlassServer): string {
 
 function totalTrafficText(server: GlassServer): string {
   const used = trafficUsageBytes(
-    server.network.received,
-    server.network.transmitted,
+    lifetimeReceived(server),
+    lifetimeTransmitted(server),
     server.trafficCalculationType,
   )
   return formatDisplayBytes(used)
+}
+
+/*
+ * 「总流量」优先用服务端跨重启累加值（net_rx_total / net_tx_total）。
+ * 旧版本 Worker 不返回这两个字段时按方向回退到网卡计数，列里始终有数字可看。
+ */
+function lifetimeReceived(server: GlassServer): number | null {
+  return server.network.receivedTotal ?? server.network.received
+}
+
+function lifetimeTransmitted(server: GlassServer): number | null {
+  return server.network.transmittedTotal ?? server.network.transmitted
 }
 
 /** 列头 tooltip 用的完整说明：流量列受站点 `show_tf` 开关影响，需要交代清楚。 */
@@ -162,7 +174,7 @@ function monthlyTrafficHint(server: GlassServer): string {
 }
 
 function totalTrafficHint(server: GlassServer): string {
-  return `累计 ↑ ${formatDisplayBytes(server.network.transmitted)}\n↓ ${formatDisplayBytes(server.network.received)}`
+  return `累计 ↑ ${formatDisplayBytes(lifetimeTransmitted(server))}\n↓ ${formatDisplayBytes(lifetimeReceived(server))}`
 }
 
 function handleRowKeydown(event: KeyboardEvent, server: GlassServer): void {

@@ -70,7 +70,12 @@ const columns = computed(() => BASE_COLUMNS.filter(
   (column) => column.key !== 'metadata' || props.metadataEnabled,
 ))
 const gridStyle = computed(() => ({
-  gridTemplateColumns: columns.value.map((column) => column.width).join(' '),
+  /*
+   * 列宽写成自定义属性而不是直接写 grid-template-columns：
+   * 手机端要用媒体查询把表头与数据行一起换成两行栅格，
+   * 而行内样式无法被媒体查询覆盖，只有属性值来自样式表时才能。
+   */
+  '--node-list-columns': columns.value.map((column) => column.width).join(' '),
 }))
 
 function columnAlign(key: string): string {
@@ -180,7 +185,7 @@ function hideMissingImage(event: Event): void {
           v-for="column in columns"
           :key="column.key"
           class="node-list__heading"
-          :class="columnAlign(column.key)"
+          :class="[columnAlign(column.key), `node-list__heading--${column.key}`]"
           role="columnheader"
         >
           {{ column.label }}
@@ -209,7 +214,7 @@ function hideMissingImage(event: Event): void {
         @keydown="handleRowKeydown($event, server)"
       >
         <div class="node-list__cells" :style="gridStyle">
-          <div class="node-list__cell" :class="columnAlign('status')">
+          <div class="node-list__cell" :class="[columnAlign('status'), 'node-list__cell--status']">
             <span class="node-status-wrap" aria-hidden="true">
               <span
                 class="node-status"
@@ -222,7 +227,7 @@ function hideMissingImage(event: Event): void {
             </span>
           </div>
 
-          <div class="node-list__cell" :class="columnAlign('os')">
+          <div class="node-list__cell" :class="[columnAlign('os'), 'node-list__cell--os']">
             <img
               class="node-list__os"
               :src="osIconUrl(server.operatingSystem)"
@@ -273,17 +278,17 @@ function hideMissingImage(event: Event): void {
             </span>
           </div>
 
-          <div class="node-list__cell" :class="columnAlign('uptime')">
+          <div class="node-list__cell" :class="[columnAlign('uptime'), 'node-list__cell--uptime']">
             <span class="node-list__sub">{{ formatUptime(server.bootTime) }}</span>
           </div>
 
-          <div class="node-list__cell node-list__cell--metric" :class="columnAlign('cpu')">
+          <div class="node-list__cell node-list__cell--metric" :class="[columnAlign('cpu'), 'node-list__cell--cpu']">
             <span class="node-list__metric-value">{{ formatPercent(server.cpu) }}</span>
             <!-- 上游 NodeList 的进度条同样按 `getStatus` 着色。 -->
             <AppProgressThin :percentage="server.cpu" :status="usageStatus(server.cpu)" />
           </div>
 
-          <div class="node-list__cell node-list__cell--metric" :class="columnAlign('mem')">
+          <div class="node-list__cell node-list__cell--metric" :class="[columnAlign('mem'), 'node-list__cell--mem']">
             <span class="node-list__metric-value">
               {{ formatPercent(ratio(server.memory.used, server.memory.total)) }}
             </span>
@@ -293,7 +298,7 @@ function hideMissingImage(event: Event): void {
             />
           </div>
 
-          <div class="node-list__cell node-list__cell--metric" :class="columnAlign('disk')">
+          <div class="node-list__cell node-list__cell--metric" :class="[columnAlign('disk'), 'node-list__cell--disk']">
             <span class="node-list__metric-value">
               {{ formatPercent(ratio(server.disk.used, server.disk.total)) }}
             </span>
@@ -316,13 +321,13 @@ function hideMissingImage(event: Event): void {
             </span>
           </div>
 
-          <div class="node-list__cell node-list__cell--bytes" :class="columnAlign('monthly')">
+          <div class="node-list__cell node-list__cell--bytes" :class="[columnAlign('monthly'), 'node-list__cell--monthly']">
             <span class="node-list__metric-value" :title="monthlyTrafficHint(server)">
               {{ monthlyTrafficText(server) }}
             </span>
           </div>
 
-          <div class="node-list__cell node-list__cell--bytes" :class="columnAlign('total')">
+          <div class="node-list__cell node-list__cell--bytes" :class="[columnAlign('total'), 'node-list__cell--total']">
             <span class="node-list__metric-value" :title="totalTrafficHint(server)">
               {{ totalTrafficText(server) }}
             </span>

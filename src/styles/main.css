@@ -1225,7 +1225,7 @@ a {
 }
 
 /*
- * 三张卡（实时网速 / 本月流量 / 累计流量）并排时的排版。
+ * 1–3 张卡（实时网速 / 本月流量 / 累计流量）在桌面端的排版。
  *
  * 球体版把卡片撑到与球体同高（约 232px），每张只有约 1/3 宽度：
  * 上游的两行栅格让每张卡约 108px 高，`space-between` 正好合适；
@@ -1234,39 +1234,44 @@ a {
  * 因此这里把「标签 + 数值」当成一整组垂直居中：图标留在右上角，
  * 其余内容落在视觉中心，卡片看起来是被内容填满的，而不是被拉长的。
  * 数值同时升一档字号，200px 的卡高下有足够的存在感。
+ *
+ * 只约束桌面宽度：手机上卡片改成整行横排，规则单独写在文末的
+ * 「手机端排版（≤639px）」一节。
  */
-.general-stage--globe:has(.overview-card:nth-child(3)):not(:has(.overview-card:nth-child(4))) .overview-card {
-  gap: 8px;
-  justify-content: flex-start;
-  padding: 16px 18px;
-  border-radius: calc(var(--radius) + 2px);
-  box-shadow: inset 0 1px rgb(255 255 255 / 8%);
-}
+@media (min-width: 768px) {
+  .general-stage--globe:not(:has(.overview-card:nth-child(4))) .overview-card {
+    gap: 8px;
+    justify-content: flex-start;
+    padding: 16px 18px;
+    border-radius: calc(var(--radius) + 2px);
+    box-shadow: inset 0 1px rgb(255 255 255 / 8%);
+  }
 
-.general-stage--globe:has(.overview-card:nth-child(3)):not(:has(.overview-card:nth-child(4))) .overview-card__head {
-  align-items: center;
-}
+  .general-stage--globe:not(:has(.overview-card:nth-child(4))) .overview-card__head {
+    align-items: center;
+  }
 
-/* 数值组在「图标行」与卡底之间居中，上下各留一半弹性空白。 */
-.general-stage--globe:has(.overview-card:nth-child(3)):not(:has(.overview-card:nth-child(4))) .overview-card__value-slot,
-.general-stage--globe:has(.overview-card:nth-child(3)):not(:has(.overview-card:nth-child(4))) .overview-card__value {
-  margin-block: auto;
-}
+  /* 数值组在「图标行」与卡底之间居中，上下各留一半弹性空白。 */
+  .general-stage--globe:not(:has(.overview-card:nth-child(4))) .overview-card__value-slot,
+  .general-stage--globe:not(:has(.overview-card:nth-child(4))) .overview-card__value {
+    margin-block: auto;
+  }
 
-.general-stage--globe:has(.overview-card:nth-child(3)):not(:has(.overview-card:nth-child(4))) .overview-card__number {
-  font-size: 28px;
-}
+  .general-stage--globe:not(:has(.overview-card:nth-child(4))) .overview-card__number {
+    font-size: 28px;
+  }
 
-/*
- * 「实时网速」是两行读数，行距留够；数值与「本月流量」同一档字号，
- * 避免上行大、下行小。
- */
-.general-stage--globe:has(.overview-card:nth-child(3)):not(:has(.overview-card:nth-child(4))) .overview-card__readings {
-  gap: 6px;
-}
+  /*
+   * 「实时网速」是两行读数，行距留够；数值与「本月流量」同一档字号，
+   * 避免上行大、下行小。
+   */
+  .general-stage--globe:not(:has(.overview-card:nth-child(4))) .overview-card__readings {
+    gap: 6px;
+  }
 
-.general-stage--globe:has(.overview-card:nth-child(3)):not(:has(.overview-card:nth-child(4))) .overview-card__reading-value {
-  font-size: 22px;
+  .general-stage--globe:not(:has(.overview-card:nth-child(4))) .overview-card__reading-value {
+    font-size: 22px;
+  }
 }
 
 .settings-field small,
@@ -2381,6 +2386,7 @@ a {
 
 .node-list__head {
   display: grid;
+  grid-template-columns: var(--node-list-columns);
   align-items: center;
   gap: 10px;
   padding: 9px 14px;
@@ -2444,6 +2450,7 @@ a {
 
 .node-list__cells {
   display: grid;
+  grid-template-columns: var(--node-list-columns);
   align-items: center;
   gap: 10px;
   overflow: hidden;
@@ -4904,13 +4911,24 @@ a {
 }
 
 /*
- * 三张卡（实时网速 / 本月流量 / 累计流量）：改成三列一行。
- * 上游的两列布局下第三张会孤零零地落在第二行右半边；三列并排正好铺满左侧整幅宽度，
- * 卡片高度与球体同行（14.5rem），既不改变页面高度，也给「实时网速」的上下两行留出空间。
- * 只在「恰好三张」时生效，其余张数仍走上面的 Komari 六格定位。
+ * 1–3 张卡（实时网速 / 本月流量 / 累计流量）：按张数等分整行。
+ * 上游的两列布局下第三张会孤零零地落在第二行右半边；改成一行后
+ * 3 张各占 4 栏、2 张各占 6 栏、1 张占满 12 栏，都铺满左侧整幅宽度，
+ * 卡片高度与球体同行（14.5rem），既不改变页面高度，也给读数留出空间。
+ * 四张起仍走上面的 Komari 六格定位；手机上的整行横排写在文末的手机端一节。
  */
 .general-stage--globe:has(.overview-card:nth-child(3)):not(:has(.overview-card:nth-child(4))) .overview-card {
   grid-column: span 4;
+  grid-row: 1;
+}
+
+.general-stage--globe:has(.overview-card:nth-child(2)):not(:has(.overview-card:nth-child(3))) .overview-card {
+  grid-column: span 6;
+  grid-row: 1;
+}
+
+.general-stage--globe:not(:has(.overview-card:nth-child(2))) .overview-card {
+  grid-column: span 12;
   grid-row: 1;
 }
 
@@ -4998,10 +5016,10 @@ a {
   }
 
   /*
-   * 桌面端三张卡：单行三列，每张占 4 栏（合计 12 栏铺满左半区）。
+   * 桌面端 1–3 张卡：单行，按张数等分（3 张各 4 栏 / 2 张各 6 栏 / 1 张 12 栏）。
    * 行数由 2 行改成 1 行，卡片高度撑满球体同行的高度，球体尺寸与页面高度都不受影响。
    */
-  .general-stage--globe:has(.overview-card:nth-child(3)):not(:has(.overview-card:nth-child(4))) .general-stage__cards {
+  .general-stage--globe:not(:has(.overview-card:nth-child(4))) .general-stage__cards {
     grid-template-rows: minmax(0, 1fr);
     grid-auto-rows: auto;
   }
@@ -6148,5 +6166,173 @@ a {
 @media (min-width: 1024px) {
   .finance-dialog__rate-grid {
     grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+/*
+ * ===== 手机端排版（≤639px）=====
+ *
+ * 手机屏宽只有 320–430px，桌面的两处排布到这里都会碎：
+ * - 总览卡片按 4 栅格并排后每张只剩约 110px，「实时网速」「本月流量」被省略号截断；
+ * - 节点列表 11 列的固定宽度合计约 1080px，只能横向滚动，一屏看不到任何指标。
+ *
+ * 因此这一段把两处都换成竖排：
+ * - 卡片整行横排：标签在左、数值在右，几张卡就占几行；
+ * - 列表行拆成两行：第一行状态 / 系统 / 节点 / 国家，
+ *   第二行 CPU / 内存 / 硬盘 / 实时网速 / 本月流量 / 总流量。
+ */
+@media (max-width: 639px) {
+  /* ---------- 总览卡片：整行横排 ---------- */
+
+  /*
+   * :is() 一次覆盖「1 张、2 张、3 张」三种情况；:is() 的优先级取内部最高的一个，
+   * 正好与上文「恰好三张」的 4 栏并排同权，写在文件更后面即可覆盖它。
+   */
+  .general-stage--globe:is(
+    :has(.overview-card:nth-child(3)):not(:has(.overview-card:nth-child(4))),
+    :has(.overview-card:nth-child(2)):not(:has(.overview-card:nth-child(3))),
+    :not(:has(.overview-card:nth-child(2)))
+  ) .overview-card {
+    grid-column: 1 / span 12;
+    grid-row: auto;
+    min-height: 50px;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 9px 14px;
+    border-radius: calc(var(--radius) + 1px);
+    box-shadow: inset 0 1px rgb(255 255 255 / 8%);
+  }
+
+  /* 图标让位给数值；读数贴右，并在窄屏缩一档字号。 */
+  .general-stage--globe:not(:has(.overview-card:nth-child(4))) .overview-card__icon {
+    display: none;
+  }
+
+  .general-stage--globe:not(:has(.overview-card:nth-child(4))) .overview-card__value-slot,
+  .general-stage--globe:not(:has(.overview-card:nth-child(4))) .overview-card__value {
+    margin-block: 0;
+  }
+
+  .general-stage--globe:not(:has(.overview-card:nth-child(4))) .overview-card__number {
+    font-size: 17px;
+  }
+
+  .general-stage--globe:not(:has(.overview-card:nth-child(4))) .overview-card__readings {
+    align-items: flex-end;
+    gap: 2px;
+  }
+
+  .general-stage--globe:not(:has(.overview-card:nth-child(4))) .overview-card__reading-value {
+    font-size: 16px;
+  }
+
+  .general-stage--globe:not(:has(.overview-card:nth-child(4))) .overview-card__reading-unit {
+    font-size: 10px;
+  }
+
+  /*
+   * 卡片组上移贴住球体下缘：三行卡片合计约 190px，
+   * 上移 8rem 让首行压住球体底部，同时不遮挡球心附近的国家标记。
+   */
+  .general-stage--globe:not(:has(.overview-card:nth-child(4))) .general-stage__cards {
+    grid-auto-rows: auto;
+    margin-top: -8rem;
+  }
+
+  /* ---------- 节点列表：两行排布 ---------- */
+
+  /* 两行排布后内容不再溢出，不需要横向滚动。 */
+  .node-list__inner {
+    min-width: 0;
+  }
+
+  /* 表头与数据行共用同一套 12 栅格，行内样式给的桌面列宽在这里被媒体查询覆盖。 */
+  .node-list__head,
+  .node-list__cells {
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    column-gap: 6px;
+    row-gap: 6px;
+  }
+
+  .node-list__head {
+    padding: 8px 12px;
+  }
+
+  .node-list__heading {
+    font-size: 10px;
+  }
+
+  .node-list__row {
+    height: auto;
+    min-height: 0;
+    max-height: none;
+    padding: 10px 12px;
+  }
+
+  /* 第一行：状态 / 系统 / 节点 / 国家 */
+  .node-list__heading--status,
+  .node-list__cell--status {
+    grid-area: 1 / 1 / 2 / 2;
+  }
+
+  .node-list__heading--os,
+  .node-list__cell--os {
+    grid-area: 1 / 2 / 2 / 3;
+  }
+
+  .node-list__heading--name,
+  .node-list__cell--name {
+    grid-area: 1 / 3 / 2 / 11;
+  }
+
+  .node-list__heading--metadata,
+  .node-list__cell--metadata {
+    grid-area: 1 / 11 / 2 / 13;
+  }
+
+  /* 第二行：CPU / 内存 / 硬盘 / 实时网速 / 本月流量 / 总流量 */
+  .node-list__heading--cpu,
+  .node-list__cell--cpu {
+    grid-area: 2 / 1 / 3 / 3;
+  }
+
+  .node-list__heading--mem,
+  .node-list__cell--mem {
+    grid-area: 2 / 3 / 3 / 5;
+  }
+
+  .node-list__heading--disk,
+  .node-list__cell--disk {
+    grid-area: 2 / 5 / 3 / 7;
+  }
+
+  .node-list__heading--rate,
+  .node-list__cell--speed {
+    grid-area: 2 / 7 / 3 / 9;
+  }
+
+  .node-list__heading--monthly,
+  .node-list__cell--monthly {
+    grid-area: 2 / 9 / 3 / 11;
+  }
+
+  .node-list__heading--total,
+  .node-list__cell--total {
+    grid-area: 2 / 11 / 3 / 13;
+  }
+
+  /* 运行时间让位给第二行指标：详情页仍然看得到。 */
+  .node-list__heading--uptime,
+  .node-list__cell--uptime {
+    display: none;
+  }
+
+  /* 窄列里数值降一档字号，避免出现省略号。 */
+  .node-list__cell--speed .node-list__sub,
+  .node-list__cell--monthly .node-list__metric-value,
+  .node-list__cell--total .node-list__metric-value {
+    font-size: 10px;
   }
 }

@@ -311,7 +311,11 @@ describe('Komari fidelity contracts', () => {
     expect(list).not.toMatch(/<table[\s>]/)
     expect(list).not.toMatch(/<tbody[\s>]/)
     expect(list).toContain('node-list__row')
-    expect(list).toContain('gridTemplateColumns')
+    /*
+     * 列宽以自定义属性下发（--node-list-columns），再由样式表应用到
+     * grid-template-columns；这样手机端媒体查询才能把列布局整个换掉。
+     */
+    expect(list).toContain('--node-list-columns')
     // 「实时网速」列插在硬盘之后（本主题的列顺序），随后是两列流量。
     for (const key of ['status', 'os', 'name', 'metadata', 'uptime', 'cpu', 'mem', 'disk', 'rate', 'monthly', 'total']) {
       expect(list).toContain(`key: '${key}'`)
